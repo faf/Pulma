@@ -1,0 +1,15 @@
+'translation' : {
+		    'value'	  : 'original value',
+		    'locale'	  : 'locale code',
+		    'translation' : 'translation'
+}
+
+'http_error' : {
+		    'time'	: 'timestamp',
+		    'aentity'	: 'id of auth entity',
+		    'dentity'	: 'id of data entity',
+		    'code'	: 'http code',
+		    'url'	: 'requested url',
+		    'fullurl'	: 'requested url in full form (with query)',
+		    'method'	: 'http request method'
+}

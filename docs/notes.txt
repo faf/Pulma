@@ -1,0 +1,1 @@
+All databases has the same internal schema. See localdb/data.sql for details.

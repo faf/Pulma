@@ -1,0 +1,96 @@
+{
+
+# Mapper configuration ##########################################################
+    'map' => {
+	'file' => '/opt/pulma/mapping',
+	'root' => ''
+    },
+
+# Data module configuration #####################################################
+    'data' => {
+	'type' => 'localdb',
+	'data' => {
+	    'driver' => 'SQLite',
+	    'dsn' => '/opt/pulma/usr/db/data.db',
+	    'user' => '',
+	    'passwd' => ''
+	},
+	'cache' => 'none'
+    },
+
+# Authorization module configuration ############################################
+    'auth' => {
+	'type' => 'localdb',
+	'data' => {
+	    'driver' => 'SQLite',
+	    'dsn' => '/opt/pulma/usr/db/auth.db',
+	    'user' => '',
+	    'passwd' => ''
+	},
+	'cache' => 'none'
+    },
+
+# Logger module configuration ###################################################
+
+    'logger' => {
+	'type' => 'localdb',
+	'data' => {
+	    'driver' => 'SQLite',
+	    'dsn' => '/opt/pulma/usr/db/logger.db',
+	    'user' => '',
+	    'passwd' => ''
+	},
+	'cache' => 'memory'
+    },
+
+########################## Pulma server configuration ##########################
+
+# System log configuration ######################################################
+    'syslog' => {
+# syslog options
+	'log_level' => 3,
+	'syslog_facility' => 'daemon',
+	'syslog_ident' => 'pulma',
+	'syslog_logopt' => 'pid|cons|nofatal'
+    },
+
+# Templates engine configuration ################################################
+
+# location of system templates
+    'templates' => {
+# location of web pages templates
+        'path' => '/opt/pulma/usr/templates/',
+
+# path to cached web pages
+	'cache' => '/opt/pulma/var/cache/pulma/'
+    },
+
+# FastCGI server configuration ##################################################
+    'fcgi' => {
+# process manager settings
+        'proc_manager' => {
+                            n_processes => 3,
+                            start_delay => 0,
+                            die_timeout => 5
+        },
+
+# binding
+        'socket_path' => ':9000',
+
+# queue length
+        'listen_queue' => 5,
+
+# location of PID file
+        'pid_file' => '/opt/pulma/var/run/pulma/pulma.pid',
+
+# chroot directory
+#       'chroot' => '/opt/pulma/',
+
+# user and group to become after server start
+        'user' => '_nginx',
+        'group' => '_nginx',
+
+# id of the current pulma node
+	'nodeid' => 'pulma01'
+    }
+}

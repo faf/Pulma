@@ -1,0 +1,31 @@
+{
+    "/before" : [
+    ],
+
+    "/after" : [
+
+	{
+	    "type" : "module",
+	    "details" : {
+	        "module" : "Pulma::Actions::Localization"
+	    },
+	    "data" : true
+	}
+
+    ],
+
+    "/default" : [
+
+	{
+	    "type" : "module",
+	    "details" : {
+	        "module" : "Pulma::Actions::Error",
+		"data" : {
+		    "code" : "404"
+		}
+	    },
+	    "logger" : true
+	}
+
+    ]
+}

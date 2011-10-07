@@ -1,0 +1,81 @@
+{
+    "/before" : [
+
+	{
+	    "type" : "module",
+	    "details" : {
+		"module" : "Dummy::Test0"
+	    },
+	    "restrictions" : {
+		"method" : "POST"
+	    },
+	    "logger" : true,
+	    "auth" : true,
+	    "data" : false
+	}
+
+    ],
+
+    "/after" : [
+
+	{
+	    "type" : "module",
+	    "details" : {
+		"module" : "Pulma::Actions::Localization"
+	    },
+	    "data" : true
+	}
+
+    ],
+
+    "/default" : [
+
+	{
+	    "type" : "module",
+	    "details" : {
+	        "module" : "Pulma::Actions::Error",
+		"data" : {
+		    "code" : "404"
+		}
+	    }
+	},
+
+	{
+	    "type" : "module",
+	    "details" : {
+		"module" : "Dummy::Test1"
+	    },
+	    "restrictions" : {
+		"method" : ["POST"]
+	    }
+	}
+    ],
+
+    "/test\\/(.+)/" : [
+
+	{
+	    "type" : "module",
+	    "details" : {
+		"module" : "Dummy::Test2"
+	    },
+	    "restrictions" : {
+		"method" : ["GET"]
+	    }
+	}
+
+    ],
+
+    "test/something" : [
+
+	{
+	    "type" : "module",
+	    "details" : {
+		"module" : "Dummy::Test3"
+	    },
+	    "logger" : true,
+	    "auth" : false,
+	    "data" : false
+	}
+
+    ]
+}
