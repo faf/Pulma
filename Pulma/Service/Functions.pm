@@ -1,20 +1,24 @@
-# Part of Pulma system
-# Module providing miscellanous service functions
-#
-# Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+=head1 Pulma::Service::Functions
+
+Part of Pulma system
+
+Module providing miscellanous service functions
+
+Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
 
 package Pulma::Service::Functions;
 
@@ -24,10 +28,11 @@ use warnings;
 require Exporter;
 
 our @ISA = ('Exporter');
-our @EXPORT = qw(&check_email &check_number &check_sum &check_uri &check_date &generate_rnd_string
-		 &calculate_password_hash &calculate_password_strength &check_login
-		 &check_color &pager &uri_escape &uri_unescape &uri_escape_utf8
-		 &truncate_string &generate_entity_id &escape);
+our @EXPORT = qw( &calculate_password_hash &calculate_password_strength
+		  &check_color &check_date &check_email &check_login
+		  &check_number &check_sum &check_uri &escape &generate_entity_id
+		  &generate_rnd_string &pager &truncate_string &uri_escape
+		  &uri_escape_utf8 &uri_unescape );
 
 use CGI::Fast qw(:standard);
 use Digest::MD5 qw(md5_hex);
@@ -37,141 +42,79 @@ use Encode qw(_utf8_on _utf8_off);
 use Regexp::Common qw(URI);
 use URI::Escape;
 
-# Function: check_email
-# Description: check email address using Email::Valid module
-# Argument(s): 1: email address (string)
-# Return: link to hash with result. hash structure: { 'result' => <result>[, 'error' => <error description>] }
-#	  where result is 1 if email is valid, or 0 - otherwise
-sub check_email {
-    my $email = shift;
-    my $temp;
-    my $result = {};
+=head1 Function: calculate_password_hash
 
-    eval {
-	$temp = Email::Valid->address(	-address => $email );
-    };
-    if ($@) {
-	$result = { 'result' => 0, 'error' => $@ };
-    }
-    elsif (!$temp) {
-	$result = { 'result' => 0, 'error' => $Email::Valid::Details };
-    }
-    else {
-	$result = { 'result' => 1 }
-    }
+=head2 Description
 
-    return $result;
-}
+Function to generate hash-encrypted password based upon values of username and
+password
 
-# Function: check_number
-# Description: check incoming value to be a valid number
-# Argument(s): 1: incoming value (string)
-# Return: 1 if number is valid, 0 - otherwise
-sub check_number {
-    my $string = shift;
+=head2 Argument(s)
 
-    return 0 unless defined $string;
-    return ($string =~ /^[0-9]+$/) ? 1 : 0;
-}
+=over
 
-# Function: check_sum
-# Description: check incoming value to be a valid money amount
-# Argument(s): 1: incoming value (string)
-# Return: 1 if money amount is valid, 0 - otherwise
-sub check_sum {
-    my $string = shift;
+=item 1. (string) username
 
-    return 0 unless defined $string;
-    return 0 if (($string eq '') || ($string eq '.'));
-    $string = '0' . $string;
-    return ($string =~ /^[0-9]+(\.[0-9]{0,2})?$/) ? 1 : 0;
-}
+=item 2. (string) password in plain text
 
-# Function: check_date
-# Description: check incoming value to be a valid date in format of YYYY-MM-DD
-# Argument(s): 1: incoming value (string)
-# Return: 1 if date is valid, 0 - otherwise
-sub check_date {
-    my $string = shift;
+=back
 
-    return 0 unless defined $string;
+=head2 Returns
 
-    return 0 unless ($string =~ /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/);
+=over
 
-# we started in 2011, while 2039 seems considerably far in future
-    return 0 if ($1 < 2011) || ($1 > 2039);
+=item (string) encrypted password
 
-    my $months = [0,31,28,31,30,31,30,31,31,30,31,30,31];
+=back
 
-# check day against value of days in month (except february)
-    return ($months->[$2] >= $3) ? 1 : 0 if ($2 != 2);
+=cut
 
-# february in non-leap years
-    return ($months->[$2] >= $3) ? 1 : 0 if (($1 % 4 != 0) || ($1 % 100 == 0) && ($1 % 400 != 0));
-
-# february in leap years
-    return ($3 >= 29) ? 1 : 0;
-}
-
-# Function: check_uri
-# Description: check incoming value to be a valid HTTP URI
-# Argument(s): 1: incoming value (string)
-# Return: 1 if URI is valid, 0 - otherwise
-sub check_uri {
-    my $string = shift;
-    $string =~ s/^https/http/;
-    return $string =~ /$RE{URI}{HTTP}/ ? 1 : 0;
-}
-
-
-
-sub generate_entity_id {
-    my $type = shift;
-    my $time = time;
-    my $salt = generate_rnd_string(7);
-    return md5_hex($type . $time . $salt);
-}
-
-# Function: generate_rnd_string
-# Description: generate random string with given length consists of alphanumeric symbols
-# Argument(s): 1: string length (number) (default: 16)
-# Return: random string
-sub generate_rnd_string {
-    my $length = shift;
-# check incoming value
-    $length = check_number($length) && ($length > 0) ? $length : 16;
-
-    my $str = '';
-    for(my $i=0; $i<$length; $i++) {
-        my $rand = int(rand(62));
-
-        if ($rand>35) { $rand += 61; }
-        elsif ($rand>9) { $rand += 55; }
-        else { $rand += 48; }
-        $str .= chr($rand);
-    }
-
-    return $str;
-}
-
-# Function calculate_password_hash
-# Description: generate password hash based upon values of username and password
-# Argument(s): 1: username (string), 2: password in plain text (string)
-# Return: password hash (string)
 sub calculate_password_hash {
     my $username = shift;
     my $password = shift;
 
-    return sha1_hex($username . "aihaixoo6eej9iXe" . $password);
+    return sha1_hex($username . $password);
 }
 
-# Function calculate_password_strength
-# Description: calculate password strength based upon it's value
-# Argument(s): 1: password in plain text (string)
-# Return: password strength (integer) - the higher is better
-#	  everything below the value of 5 should be considered as weak
-#	  everything below or equal to the value of 8 should be considered as moderate
-#	  everything higher than the value of 8 should be considered as strong
+=head1 Function: calculate_password_strength
+
+=head2 Description
+
+Function to calculate password strength based upon it's value
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) password in plain text
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (integer) password strength
+
+=back
+
+=head2 Strength level
+
+Whole idea - the higher the better
+
+=over
+
+=item everything below the value of 5 should be considered as weak
+
+=item everything below or equal to the value of 8 should be considered as
+moderate
+
+=item everything higher than the value of 8 should be considered as strong
+
+=back
+
+=cut
+
 sub calculate_password_strength {
     my $password = shift;
 
@@ -212,69 +155,495 @@ sub calculate_password_strength {
     return $weight;
 }
 
-# Function check_login
-# Description: validate login (correct login could contain only latin letters and digits)
-#	       and should be at least 3 symbols long and no more than 15 symbols long
-# Argument(s): 1: login (string)
-# Return: 1 if validation passed, 0 - otherwise
-sub check_login {
-    my $login = shift;
-    return 0 unless defined $login;
-    return ($login =~ /^[A-Za-z0-9]{3,15}$/) ? 1 : 0;
-}
+=head1 Function: check_color
 
-# Function check_color
-# Description: validate value to be a correct color in RGB format (i.e. #xxxxxx)
-# Argument(s): 1: value (string)
-# Return: 1 if validation passed, 0 - otherwise
+=head2 Description
+
+Function to check value to be a correct color in RGB format (i.e. #xxxxxx)
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to check
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 if validation passed I<or> 0 - otherwise
+
+=back
+
+=cut
+
 sub check_color {
     my $value = shift;
     return 0 unless defined $value;
     return ($value =~ /^\#[A-Fa-f0-9]{6}$/) ? 1 : 0;
 }
 
-# Function: pager
-# Description: building a navigation structure based upon incoming data structure
-# Argument(s): 1: data structure (link to hash)
-# Return: navigation structure (link to hash)
-# NOTE:
-# data structure format: { 'limit' => <number of items per page>, 'count' => <overall number of items>, 'page' => <current page> }
-# navigation structure format: { 'pages_count' => <number of pages>,
-#				 'limit => <number of items per page>,
-#				 'page' => <current page>,
-#				 'items' => <number of items>,
-#				 'beg' => <page number to begin pager from>,
-#				 'end' => <page number to end pager at>
-#				}
+=head1 Function: check_date
+
+=head2 Description
+
+Function to check incoming value to be a valid date in format of YYYY-MM-DD
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to check
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 if validation passed I<or> 0 - otherwise
+
+=back
+
+=cut
+
+sub check_date {
+    my $string = shift;
+
+    return 0 unless defined $string;
+
+    return 0 unless ($string =~ /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/);
+
+# we started in 2011, while 2039 seems considerably far in future
+    return 0 if ($1 < 2011) || ($1 > 2039);
+
+    my $months = [0,31,28,31,30,31,30,31,31,30,31,30,31];
+
+# check day against value of days in month (except february)
+    return ($months->[$2] >= $3) ? 1 : 0 if ($2 != 2);
+
+# february in non-leap years
+    return ($months->[$2] >= $3) ? 1 : 0 if (($1 % 4 != 0) || ($1 % 100 == 0) && ($1 % 400 != 0));
+
+# february in leap years
+    return ($3 >= 29) ? 1 : 0;
+}
+
+
+=head1 Function: check_email
+
+=head2 Description
+
+Function to check value to be a valid email address (using Email::Valid module)
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to check
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (link to hash) check result
+
+=back
+
+=head2 Structure of check result hash
+
+{
+
+    'result' => <result>,
+
+    'error' => <error message>
+
+}
+
+Where result is 1 if email is valid I<or> 0 - otherwise. Error message is set
+only if result is 0.
+
+=cut
+
+sub check_email {
+    my $email = shift;
+    my $temp;
+    my $result = {};
+
+    eval {
+	$temp = Email::Valid->address( -address => $email );
+    };
+    if ($@) {
+	$result = { 'result' => 0, 'error' => $@ };
+    }
+    elsif (!$temp) {
+	$result = { 'result' => 0, 'error' => $Email::Valid::Details };
+    }
+    else {
+	$result = { 'result' => 1 }
+    }
+
+    return $result;
+}
+
+=head1 Function: check_login
+
+=head2 Description
+
+Function to validate login (correct login could contain only latin letters and
+digits) and should be at least 3 symbols long and no more than 15 symbols long
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to check
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 if validation passed I<or> 0 - otherwise
+
+=back
+
+=cut
+
+sub check_login {
+    my $login = shift;
+    return 0 unless defined $login;
+    return ($login =~ /^[A-Za-z0-9]{3,15}$/) ? 1 : 0;
+}
+
+=head1 Function: check_number
+
+=head2 Description
+
+Function to check incoming value to be a valid number
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to check
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 if validation passed I<or> 0 - otherwise
+
+=back
+
+=cut
+
+sub check_number {
+    my $string = shift;
+    return 0 unless defined $string;
+    return ($string =~ /^[0-9]+$/) ? 1 : 0;
+}
+
+=head1 Function: check_sum
+
+=head2 Description
+
+Function to check incoming value to be a valid money amount
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to check
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 if validation passed I<or> 0 - otherwise
+
+=back
+
+=cut
+
+sub check_sum {
+    my $string = shift;
+    return 0 unless defined $string;
+    return 0 if (($string eq '') || ($string eq '.'));
+    $string = '0' . $string;
+    return ($string =~ /^[0-9]+(\.[0-9]{0,2})?$/) ? 1 : 0;
+}
+
+=head1 Function: check_uri
+
+=head2 Description
+
+Function to check incoming value to be a valid HTTP URI (using Regexp::Common
+module)
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to check
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 if validation passed I<or> 0 - otherwise
+
+=back
+
+=cut
+
+sub check_uri {
+    my $string = shift;
+    $string =~ s/^https/http/;
+    return $string =~ /$RE{URI}{HTTP}/ ? 1 : 0;
+}
+
+
+=head1 Function: escape
+
+=head2 Description
+
+see function B<escapeHTML> in CGI module
+
+=head2 Argument(s)
+
+=over
+
+=item see function B<escapeHTML> in CGI module
+
+=back
+
+=head2 Returns
+
+=over
+
+=item see function B<escapeHTML> in CGI module
+
+=back
+
+=cut
+
+sub escape {
+    return escapeHTML(@_);
+}
+
+=head1 Function: generate_entity_id
+
+=head2 Description
+
+Function to generate entity id based upon entity type, actual time and some
+random value
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) entity type
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (string) entity id
+
+=back
+
+=cut
+
+sub generate_entity_id {
+    my $type = shift;
+    my $time = time;
+    my $salt = generate_rnd_string(7);
+    return md5_hex($type . $time . $salt);
+}
+
+=head1 Function: generate_rnd_string
+
+=head2 Description
+
+Function to generate random string with given length consists of latin
+alphanumeric symbols
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (integer) string length (optional, default value: 16)
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (string) random string
+
+=back
+
+=cut
+
+sub generate_rnd_string {
+    my $length = shift;
+
+# check incoming value
+    $length = check_number($length) && ($length > 0) ? $length : 16;
+
+    my $str = '';
+    for(my $i=0; $i<$length; $i++) {
+        my $rand = int(rand(62));
+
+        if ($rand>35) { $rand += 61; }
+        elsif ($rand>9) { $rand += 55; }
+        else { $rand += 48; }
+        $str .= chr($rand);
+    }
+
+    return $str;
+}
+
+=head1 Function: pager
+
+=head2 Description
+
+Function to build a navigation structure for pager based upon incoming data
+structure (pretending that pager containts maximum 10 links to pages)
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to hash) incoming data
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (link to hash) navigation structure
+
+=back
+
+=head2 Incoming data structure
+
+{
+
+    'limit' => <number of items per page>,
+
+    'count' => <overall number of items>,
+
+    'page' => <current page>
+
+}
+
+=head2 Navigation structure
+
+{
+
+    'pages_count' => <number of pages>,
+
+    'limit => <number of items per page>,
+
+    'page' => <current page>,
+
+    'items' => <number of items>,
+
+    'beg' => <page number to begin pager from>,
+
+    'end' => <page number to end pager at>
+
+}
+
+=cut
+
 sub pager {
     my $data = shift;
 
     my $pager = {
-	'pages_count' => int($data->{'count'} / $data->{'limit'}) + ($data->{'count'} % $data->{'limit'} ? 1 : 0),
+	'pages_count' => int($data->{'count'} / $data->{'limit'}) +
+			($data->{'count'} % $data->{'limit'} ? 1 : 0),
 	'limit' => $data->{'limit'},
 	'page' => $data->{'page'},
 	'items' => $data->{'count'}
     };
 
     if ($pager->{'pages_count'} > 9) {
+
 	$pager->{'beg'} = ($pager->{'page'} < 4) ? 0 : ($pager->{'page'}  - 4);
-	$pager->{'end'} = (($pager->{'pages_count'} - $pager->{'page'}) > 5) ? ($pager->{'page'} + 4) : ($pager->{'pages_count'} - 1);
+
+	$pager->{'end'} = (($pager->{'pages_count'} - $pager->{'page'}) > 5) ?
+			    ($pager->{'page'} + 4) :
+			    ($pager->{'pages_count'} - 1);
+
 	if (($pager->{'end'} - $pager->{'beg'})<8) {
-	    if ($pager->{'end'} == ($pager->{'pages_count'} - 1)) { $pager->{'beg'} = $pager->{'end'} - 8; }
-	    else { $pager->{'end'} = $pager->{'beg'} + 8; }
+
+	    if ($pager->{'end'} == ($pager->{'pages_count'} - 1)) {
+
+		    $pager->{'beg'} = $pager->{'end'} - 8;
+
+	    }
+	    else {
+
+		    $pager->{'end'} = $pager->{'beg'} + 8;
+
+	    }
 	}
-    } else {
+
+    }
+    else {
+
 	$pager->{'beg'} = 0;
 	$pager->{'end'} = $pager->{'pages_count'} - 1;
+
     }
 
     return $pager;
 }
 
-# Function truncate_string
-# Description: truncate string to a given limit
-# Argument(s): 1: value (string)[, 2: limit (integer, default: 10)]
-# Return: truncated string
+=head1 Function: truncate_string
+
+=head2 Description
+
+Function to (Unicode-friendly) truncate string to a given length
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) string to truncate
+
+=item 2. (integer) truncation length (optional, default value: 10)
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (string) truncated string
+
+=back
+
+=cut
+
 sub truncate_string {
     my $string = shift;
     my $limit = shift;
@@ -291,8 +660,76 @@ sub truncate_string {
     return $string;
 }
 
-sub escape {
-    return escapeHTML(@_);
-}
+=head1 Function: uri_escape
+
+=head2 Description
+
+see URI::Escape module for details
+
+=head2 Argument(s)
+
+=over
+
+=item see URI::Escape module for details
+
+=back
+
+=head2 Returns
+
+=over
+
+=item see URI::Escape module for details
+
+=back
+
+=cut
+
+=head1 Function: uri_escape_utf8
+
+=head2 Description
+
+see URI::Escape module for details
+
+=head2 Argument(s)
+
+=over
+
+=item see URI::Escape module for details
+
+=back
+
+=head2 Returns
+
+=over
+
+=item see URI::Escape module for details
+
+=back
+
+=cut
+
+=head1 Function: uri_unescape
+
+=head2 Description
+
+see URI::Escape module for details
+
+=head2 Argument(s)
+
+=over
+
+=item see URI::Escape module for details
+
+=back
+
+=head2 Returns
+
+=over
+
+=item see URI::Escape module for details
+
+=back
+
+=cut
 
 1;

@@ -23,7 +23,7 @@ You should have received a copy of the GNU General Public License
 
 use strict;
 use warnings;
-use vars qw($VERSION);
+use vars qw( $VERSION );
 
 $VERSION = "0.0.1";
 
@@ -82,16 +82,22 @@ $Pulma::Service::Log::Facility = $config->{'syslog'}->{'syslog_facility'};
 
 # chroot if need to
 if (defined $config->{'fcgi'}->{'chroot'}) {
+
     unless (chroot($config->{'fcgi'}->{'chroot'})) {
+
 	log_it( 'err',
 		"Can't chroot to %s: %s",
 		$config->{'fcgi'}->{'chroot'}, $! );
+
     }
     else {
+
 	log_it( 'debug',
 		"Chroot to %s successful",
 		$config->{'fcgi'}->{'chroot'} );
+
     }
+
 }
 
 # set GID and UID
@@ -100,109 +106,161 @@ my $group = $);
 
 # check UID to run as
 if (!defined $config->{'fcgi'}->{'user'}) {
+
     log_it('info', "User not defined, use default: %s", $user);
+
 }
 else {
+
     if ($config->{'fcgi'}->{'user'} =~ /^([\w-]+)$/) {
+
         $user = check_number($config->{'fcgi'}->{'user'}) ?
 		$config->{'fcgi'}->{'user'} :
 		getpwnam($config->{'fcgi'}->{'user'});
+
 	unless (defined $user) {
+
 	    log_it( 'err',
 		    "Can't determine UID of user %s: no such user",
 		    $config->{'fcgi'}->{'user'} );
+
 	    exit(1);
+
 	}
+
     }
     else {
+
 	log_it( 'err',
 		"Invalid user %s",
 		$config->{'fcgi'}->{'user'} );
+
 	exit(1);
+
     }
+
     log_it( 'debug', "Determined UID to start as: %s", $user );
 }
 
 # check GID to run as
 if (!defined $config->{'fcgi'}->{'group'}) {
+
     log_it( 'info',
 	    "Group not defined, use default: %s",
 	    $group );
+
 }
 else {
+
     if ($config->{'fcgi'}->{'group'} =~ /^([\w-]+)$/) {
+
     $group = check_number($config->{'fcgi'}->{'group'}) ?
 			  $config->{'fcgi'}->{'group'} :
 			  getgrnam($config->{'fcgi'}->{'group'});
+
     unless (defined $group) {
+
 	    log_it( 'err',
 		    "Can't determine GID of group %s: no such group",
 		    $config->{'fcgi'}->{'group'} );
+
 	    exit(1);
+
 	}
     }
     else {
+
 	log_it( 'err',
 		"Invalid group %s",
 		$config->{'fcgi'}->{'group'} );
+
 	exit(1);
+
     }
+
     log_it('debug', "Determined GID to start as: %s", $group);
+
 }
 
 # try to set GID
 POSIX::setgid($group);
 unless ( ($group == $() && ($group == $)) ) {
+
     log_it('err', "Can't set GID %s: %s", $group, $!);
+
     exit(1);
+
 }
 else {
+
     log_it('info', "Changed GID to %s", $group);
+
 }
 
 # try to set SID
 POSIX::setuid($user);
 unless ( ($user == $>) && ($user == $<) ) {
+
     log_it('err', sprintf("Can't set UID %s: %s", $user, $!));
+
     exit(1);
+
 }
 else {
+
     log_it('info', "Changed UID to %s", $user);
+
 }
 
 # check old PID file
 if (-e $config->{'fcgi'}->{'pid_file'}) {
+
 # PID file exists - try to check PID written there
     unless (open(IN, '<' . $config->{'fcgi'}->{'pid_file'})) {
+
         log_it( 'err',
 		"Old PID file %s exists and isn't readable: %s",
 		$config->{'fcgi'}->{'pid_file'},
 		$! );
+
         exit(1);
+
     }
     my $old_pid = <IN>;
     unless (close IN) {
+
         log_it( 'err',
 		"Can't close PID file %s opened for read: %s",
 		$config->{'fcgi'}->{'pid_file'}, $! );
+
         exit(1);
+
     }
 # PID in PID file is valid and there is an appropriate process - leave
     if ( check_number($old_pid) && kill(0, $old_pid) ) {
+
         log_it( 'err',
 		"FastCGI server already running with PID %s",
 		$old_pid );
+
         exit(1);
+
     }
     else {
 # PID in PID file isn't valid - try to remove old PID file
+
         unless ( unlink $config->{'fcgi'}->{'pid_file'} ) {
+
             log_it( 'err',
 		    "Can't delete PID file %s of the dead FastCGI server process: %s",
 		    $config->{'fcgi'}->{'pid_file'}, $! );
+
             exit(1);
+
         }
+
     }
+
 }
 
 my $pid;
@@ -212,20 +270,28 @@ unless ($_devel) {
     FORK: {
         $pid = fork;
         if ($pid) {
+
         log_it('info', "Gone to background with PID %s", $pid);
+
 # open PID file to write there PID
             unless (open(OUT, '>' . $config->{'fcgi'}->{'pid_file'})) {
+
                 log_it( 'err',
 			"Can't open PID file %s: %s",
 			$config->{'fcgi'}->{'pid_file'}, $! );
+
                 exit(1);
+
             }
+
             print OUT $pid;
             close OUT || log_it( 'warning',
 				 "Can't close PID file %s opened for write: %s",
 				 $config->{'fcgi'}->{'pid_file'}, $! );
             exit;
+
         }
+
         if (!defined $pid) {
             if ($! =~ /No more process/) {
                 sleep 5;
@@ -251,12 +317,16 @@ unless ($_devel) {
 # redirect all standard descriptors to /dev/null
     for my $handle (*STDIN, *STDOUT, *STDERR) {
         unless (open($handle, "+>", "/dev/null")) {
+
             log_it( 'err',
 		    "Can't reopen descriptor %s to /dev/null: %s",
 		    $handle, $! );
+
         }
         else {
+
             log_it('debug', "Descriptor %s reopened to /dev/null", $handle);
+
         }
     }
 }
@@ -349,29 +419,43 @@ while($request = CGI::Fast->new()) {
 
 # check step type and details
 	unless ($step->{'type'} eq 'module') {
+
 	    log_it( 'warn',
 		    "Step is of type %s which is currently unsupported",
 		    $step->{'type'} );
+
 	    next;
+
 	}
 	elsif (!exists($step->{'details'}->{'module'})) {
+
 	    log_it('err', 'Step module not specified!');
+
 	    next;
+
 	}
 	else {
 # step type is module:
 # try to require step's module for the first time (if need to)
+
 	    unless (exists($modules->{$step->{'details'}->{'module'}})) {
+
 		eval "require $step->{'details'}->{'module'};";
 		if ($@) {
+
 		    log_it( 'err',
 			    "Failed to require module %s : %s",
 			    $step->{'details'}->{'module'}, $@ );
+
 		    next;
+
 		}
 		else {
+
 		    $modules->{$step->{'details'}->{'module'}} = 1;
+
 		}
+
 	    }
 
 # try to initialize data handler for the first time (if need to)
@@ -381,6 +465,7 @@ while($request = CGI::Fast->new()) {
 				       ($step->{'auth'} ? 1 : 0) .
 				       ($step->{'data'} ? 1 : 0) .
 				       ($step->{'logger'} ? 1 : 0)}) ) {
+
 		    my $conf = {};
 		    foreach ('auth', 'data', 'logger') {
 			$conf->{$_} = $config->{$_} if ($step->{$_});
@@ -388,16 +473,21 @@ while($request = CGI::Fast->new()) {
 
 		    my $obj = $step->{'details'}->{'module'}->new($conf, \$cache);
 		    if (defined $obj) {
+
 			$objects->{$step->{'details'}->{'module'} .
 				   ($step->{'auth'} ? 1 : 0) .
 				   ($step->{'data'} ? 1 : 0) .
 				   ($step->{'logger'} ? 1 : 0)} = $obj;
+
 		    }
 		    else {
+
 			log_it( 'err',
 				"Failed to initialize object of class %s : undefined",
 				$step->{'details'}->{'module'} );
+
 			next;
+
 		    }
 	    }
 
@@ -407,6 +497,7 @@ while($request = CGI::Fast->new()) {
 			       ($step->{'data'} ? 1 : 0) .
 			       ($step->{'logger'} ? 1 : 0)}->action( $data,
 			    					     $step->{'details'}->{'data'} || {} );
+
 	}
 
     }
@@ -427,6 +518,7 @@ while($request = CGI::Fast->new()) {
 
 # prepare cookies to store
     foreach my $cookie (@{$data->{'result'}->{'cookies'}}) {
+
 	push(@{$data->{'result'}->{'headers'}->{'-cookie'}},
 	     cookie( -name => $cookie->{'name'} || 'pulma',
 		     -secure => $cookie->{'secure'} || 0,
@@ -435,6 +527,7 @@ while($request = CGI::Fast->new()) {
 		     -path => $cookie->{'path'} || '/',
 		     -expires => ($cookie->{'delete'} ? '-' : '+') .
 				 ($cookie->{'expires'} || '120') . 's'));
+
     }
 
 # send output to client
@@ -475,10 +568,12 @@ END {
 
 # main FastCGI script should delete PID file when dying
     if ((defined $pid) && ($pid == $$)) {
+
         unlink($config->{'fcgi'}->{'pid_file'}) ||
 	    log_it( 'err',
 		    "Can't delete PID file %s: %s",
 		    $config->{'fcgi'}->{'pid_file'}, $! );
+
     }
 
 }

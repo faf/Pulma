@@ -40,13 +40,17 @@ Class constructor
 
 =over
 
-=item 1: (link to hash) configuration
+=item 1. (link to hash) configuration
 
 =back
 
 =head2 Returns
 
-(object) instance of class
+=over
+
+=item (object) instance of class
+
+=back
 
 =head2 Configuration hash structure
 
@@ -88,13 +92,17 @@ template with
 
 =over
 
-=item 1: (link to hash) data structure (see system documentation for details)
+=item 1. (link to hash) data structure (see system documentation for details)
 
 =back
 
 =head2 Returns
 
-(link to hash) data structure (with generated document as result->document)
+=over
+
+=item (link to hash) data structure (with generated document as result->document)
+
+=back
 
 =cut
 

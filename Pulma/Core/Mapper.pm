@@ -1,18 +1,62 @@
+=head1 Pulma::Core::Mapper
+
+Part of Pulma system
+
+Class for incoming request mapping
+
+Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
+
 package Pulma::Core::Mapper;
 
 use strict;
 use warnings;
 
-use Pulma::Service::Log;
 use Pulma::Cacher::File;
 use Pulma::Service::Data::Parser;
+use Pulma::Service::Log;
 
-# Method: new
-# Description: constructor
-# Argument(s): 1: config (link to hash)
-# Return: object
-#
-# Config hash structure: see docs for cbc.conf format
+=head1 Method: new
+
+=head2 Description
+
+Class constructor
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to hash) configuration
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (object) instance of class
+
+=back
+
+=head2 Configuration hash structure
+
+see in example Pulma configuration file (section map)
+
+=cut
+
 sub new {
     my $package = shift;
     my $config = shift;
@@ -30,6 +74,30 @@ sub new {
 
     return bless($self, $package);
 }
+
+=head1 Method: steps
+
+=head2 Description
+
+Method to determine chain of steps (data handlers) for the incoming request
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to link to hash) request hash
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (link to array) chain of steps
+
+=back
+
+=cut
 
 sub steps {
     my $self = shift;
@@ -50,6 +118,7 @@ sub steps {
 	'after' => undef
     };
 
+# try to determine default steps
     if (exists($map->{'/default'})) {
 	$variants->{'default'} = $map->{'/default'};
     }
@@ -57,13 +126,17 @@ sub steps {
 	log_it('warning', __PACKAGE__ . '::steps: default steps missing!');
     }
 
+# try to determine neccessary starting and finishing steps
     $variants->{'before'} = $map->{'/before'} if exists($map->{'/before'});
     $variants->{'after'} = $map->{'/after'} if exists($map->{'/after'});
 
+# look in mapping for exact matching of requested path
     if (exists($map->{$request->{'path'}})) {
 	$variants->{'real'} = $map->{$request->{'path'}};
     }
     else {
+# exact match not found, test requested path againts regular expressions in
+# mapping
 	foreach my $key (sort(keys(%$map))) {
 	    next unless ($key =~ /^\/(.+)\/$/) && eval { '' =~ /$1/; 1 };
 	    my $template = $1;
@@ -82,6 +155,8 @@ sub steps {
 	'after' => []
     };
 
+# take into account all restrictions for all chains of steps (default, found,
+# starting and finishing)
     foreach ('default', 'real', 'before', 'after') {
 	next unless defined $variants->{$_};
 	foreach my $step (@{$variants->{$_}}) {
@@ -106,8 +181,10 @@ sub steps {
 	}
     }
 
+# use found chain of steps if there are at least one, otherwise - use default chain of steps
     my $result = (scalar(@{$steps->{'real'}})) ? $steps->{'real'} : $steps->{'default'};
 
+# add starting and finishing chains
     @$result = (@{$steps->{'before'}}, @$result, @{$steps->{'after'}});
 
     return $result;

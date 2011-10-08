@@ -1,9 +1,55 @@
+=head1 Pulma::Cacher::Data
+
+Part of Pulma system
+
+Class for using standard memory caching mechanism of Pulma system
+
+Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
+
 package Pulma::Cacher::Data;
 
 use strict;
 use warnings;
 
 use Pulma::Service::Log;
+
+=head1 Method: new
+
+=head2 Description
+
+Class constructor
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to link to hash) standard memory cache
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (object) instance of class
+
+=back
+
+=cut
 
 sub new {
     my $package = shift;
@@ -17,17 +63,47 @@ sub new {
     return bless($self, $package);
 }
 
+=head1 Method: get
+
+=head2 Description
+
+Method to get entity from cache
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) entity id
+
+=item 2. (integer) last modification timestamp
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (link to hash) entity I<or> undef if (actual) entity was not found in cache
+
+=back
+
+=cut
+
 sub get {
     my $self = shift;
     my $id = shift;
     my $time = shift;
 
+# look for entity with given id in cache
     if (exists(${$self->{'cache'}}->{$id})) {
+# check last modification time
 	if (${$self->{'cache'}}->{$id}->{'modtime'} < $time) {
+# entity in cache obsolete - remove it from cache
 	    $self->del($id);
 	    return undef;
 	}
 	else {
+# actual entity found in cache
 	    return ${$self->{'cache'}}->{$id};
 	}
     }
@@ -35,6 +111,32 @@ sub get {
 	return undef;
     }
 }
+
+=head1 Method: put
+
+=head2 Description
+
+Method to put entity into cache
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) entity id
+
+=item 2. (link to hash) entity
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 in all cases
+
+=back
+
+=cut
 
 sub put {
     my $self = shift;
@@ -45,6 +147,30 @@ sub put {
 
     return 1;
 }
+
+=head1 Method: del
+
+=head2 Description
+
+Method to remove entity from cache
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) entity id
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 in all cases
+
+=back
+
+=cut
 
 sub del {
     my $self = shift;
