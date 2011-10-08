@@ -1063,7 +1063,7 @@ sub _get_entities_from_localdb {
 	    }
 
 # no entities for the current filter => no entities should be returned at all
-	    unless (scalar(@{$res->{'data'})) {
+	    unless (scalar(@{$res->{'data'}})) {
 
 		log_it( 'debug',
 			__PACKAGE__ . '::_get_entities_from_localdb: no entities for filter, skip remaining filters' );
