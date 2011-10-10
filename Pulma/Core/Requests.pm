@@ -114,6 +114,8 @@ Method to get all incoming request's parameters
 
     'remoteip' => <remote ip address>,
 
+    'useragent' => <remote user agent>,
+
     'urlbase' => <base url of the requested url>,
 
     'url' => <url in short form, without query string>,
@@ -160,6 +162,7 @@ sub request {
 		    'cookies' => $cookies,
 		    'method' => request_method(),
 		    'remoteip' => remote_addr(),
+		    'useragent' => user_agent(),
 		    'urlbase' => url(-base => 1),
 		    'url' => url(-absolute => 1, -path => 1),
 		    'fullurl' => url(-absolute => 1, -query => 1, -path => 1),
@@ -215,10 +218,6 @@ sub _get_params {
 # fetch all url parameters (i.e. parameters in URI when method is POST)
     my @params = url_param();
     foreach my $param (@params) {
-
-# ignore special parameters
-	next if ($param eq 'username');
-	next if ($param eq 'password');
 
 	if ($param eq 'keywords') {
 	    map { $res->{$_} = [1] } split(/\;/, url_param($param));

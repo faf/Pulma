@@ -11,5 +11,7 @@
 		    'code'	: 'http code',
 		    'url'	: 'requested url',
 		    'fullurl'	: 'requested url in full form (with query)',
-		    'method'	: 'http request method'
+		    'method'	: 'http request method',
+		    'remoteip'	: 'remote ip address',
+		    'useragent'	: 'remote user agent'
 }

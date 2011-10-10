@@ -43,9 +43,12 @@ Class constructor
 
 =over
 
-=item 1. (link to hash) config
+=item 1. (link to hash) config (later accessible as $object->{config})
 
 =item 2. (link to link to hash) cache
+
+=item 2. (link to object) standard output generator (later accessible as
+$object->{output})
 
 =back
 
@@ -78,10 +81,13 @@ sub new {
     my $config = shift;
     my $cache = shift;
     $cache = $$cache;
+    my $output = shift;
+    $output = $$output;
 
 # store configuration
     my $self = {
-	'config' => $config
+	'config' => $config,
+	'output' => $output
     };
 
     if (exists($config->{'logger'})) {

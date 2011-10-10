@@ -25,6 +25,8 @@ package Pulma::Actions::Localization;
 use strict;
 use warnings;
 
+use Pulma::Service::Constants;
+
 use Pulma::Actions::Prototype;
 our @ISA = ('Pulma::Actions::Prototype');
 
@@ -112,7 +114,9 @@ sub action {
 	     'expires' => 30 * 24 * 3600 }
     );
 
-    if ($data->{'pulma'}->{'locale'} ne 'en') {
+    if ( ($data->{'pulma'}->{'locale'} ne 'en') &&
+	($data->{'result'}->{'status'} != REDIRECT) &&
+	!($data->{'result'}->{'binmode'}) ) {
 
 	$data->{'pulma'}->{'data'} = $self->_translate( $data->{'pulma'}->{'locale'},
 							$data->{'pulma'}->{'data'} );

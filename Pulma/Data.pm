@@ -976,6 +976,81 @@ sub delete_entity {
     }
 }
 
+=head1 Method: delete_entities
+
+=head2 Description
+
+Method to delete existed entities
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to array) filters to choose entities
+
+=item 2. (string) entities' type
+
+=back
+
+=head2 Results
+
+=over
+
+=item (link to hash) resulting hash
+
+=back
+
+=head2 Structure of resulting hash
+
+{
+    'deleted'	=> <number of successfully deleted entities>,
+
+    'failed'	=> <number of entities failed to delete>
+
+}
+
+=cut
+
+sub delete_entities {
+    my $self = shift;
+    my $filters = shift;
+    my $etype = shift;
+
+    my $result = { 'deleted' => 0, 'failed' => 0 };
+
+    if ($self->{'config'}->{'type'} eq 'localdb') {
+
+	my $entities = $self->_get_entities_from_localdb($filters, $etype);
+	
+
+	foreach my $entity (@$entities) {
+
+	    my $res = $self->delete_entity( { 'id' => $entity,
+					      'etype' => $etype } );
+
+	    if ($res) {
+		$result->{'deleted'}++;
+	    }
+	    else {
+		$result->{'failed'}++;
+	    }
+
+	}
+
+	return $result;
+
+    }
+    else {
+
+	log_it( 'warning',
+		__PACKAGE__ . "::delete_entities: unknown backend type %s, can't obtain data!",
+		$self->{'config'}->{'type'} );
+
+    }
+
+    return $result;
+}
+
 ############################## Private methods ##################################
 
 # Method: _get_entities_from_localdb

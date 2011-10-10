@@ -139,12 +139,14 @@ sub action {
 	'attributes' => {
 
 	    'time'	=> [ time ],
-	    'aentity'	=> [ exists($data->{'pulma'}->{'user'}->{'id'}) ? $data->{'pulma'}->{'user'}->{'id'} : 0 ],
+	    'aentity'	=> [ exists($data->{'pulma'}->{'auth'}->{'user'}->{'id'}) ? $data->{'pulma'}->{'auth'}->{'user'}->{'id'} : 0 ],
 	    'dentity'	=> [ 0 ],
 	    'code'	=> [ $data->{'result'}->{'status'} ],
 	    'url'	=> [ $data->{'request'}->{'url'} ],
 	    'fullurl'	=> [ $data->{'request'}->{'fullurl'} ],
-	    'method'	=> [ $data->{'request'}->{'method'} ]
+	    'method'	=> [ $data->{'request'}->{'method'} ],
+	    'remoteip'	=> [ $data->{'request'}->{'remoteip'} ],
+	    'useragent'	=> [ $data->{'request'}->{'useragent'} ]
 
 	}
 
