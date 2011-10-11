@@ -1,0 +1,220 @@
+#!/usr/bin/perl
+=head1 Pulma passwords generator
+
+Part of Pulma system
+
+Script to import data from files into data sources
+
+Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
+
+use strict;
+use warnings;
+
+use lib qw( ../ );
+
+use Pulma::Auth;
+use Pulma::Data;
+use Pulma::Logger;
+
+use Pulma::Service::Data::Parser;
+
+use Getopt::Long qw(:config no_ignore_case bundling no_auto_abbrev);
+use Pod::Usage;
+
+=head1 Usage
+
+=over
+
+=item import_data [--quiet] --config <Pulma configuration file> --to
+<data|auth|logger> --file <file1> [, --file <file2>, ...]
+
+=item I<or>
+
+=item import_data --help
+
+=back
+
+When used in quiet mode only errors will be displayed
+
+=cut
+
+# get options
+my $options = {};
+our @files;
+
+unless ( GetOptions( $options,
+		     'help|h',
+		     'config|c=s',
+		     'to=s',
+		     'quiet|q',
+		     'file|f=s' => \@files) ) {
+
+    pod2usage(-exitval => 1, -verbose => 2);
+
+}
+
+if (exists($options->{'help'})) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !exists($options->{'config'}) || !scalar(@files) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+
+if ( !exists($options->{'to'}) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+# check specified configuration file
+
+unless (-r $options->{'config'}) {
+
+    print STDERR
+	  sprintf( "[error] Configuration file %s not exist or not readable!\n",
+		   $options->{'config'} );
+    exit(1);
+
+}
+
+# get configuration
+
+my $config = do($options->{'config'});
+if ($@) {
+
+    print STDERR sprintf("[error] Bad configuration format: %s\n", $@);
+    exit(1);
+
+}
+elsif (!defined $config) {
+
+    print STDERR sprintf("[error] Can't read configuration: %s\n", $!);
+    exit(1);
+
+}
+
+# initialize data source (destination, actually) object
+my $dest;
+my $null = {};
+if ($options->{'to'} eq 'data') {
+
+    $dest = Pulma::Data->new($config->{'data'}, \$null);
+
+}
+elsif ($options->{'to'} eq 'auth') {
+
+    $dest = Pulma::Auth->new($config->{'auth'}, \$null);
+
+
+}
+elsif ($options->{'to'} eq 'logger') {
+
+    $dest = Pulma::Logger->new($config->{'logger'}, \$null);
+
+}
+else {
+
+    print STDERR sprintf( "[error] Unknown data source '%s'!\n",
+			  $options->{'to'} );
+    exit(1);
+
+}
+
+unless ($dest) {
+
+    print STDERR sprintf( "[error] Can't initialize data object '%s'\n",
+			  $options->{'to'} );
+    exit(1);
+
+}
+
+# initialize data parser
+my $parser = Pulma::Service::Data::Parser->new();
+
+# proceed files with entities to import
+foreach my $file (@files) {
+
+    print sprintf("[info] Import entity from file '%s'\n", $file)
+	    unless ($options->{'quiet'});
+
+    unless (-r $file) {
+
+	print STDERR sprintf( "[error] File '%s' not exist or not readable!\n",
+			      $file );
+	next;
+
+    }
+
+# read data from file
+    my @contents;
+    if (open(IN, "<$file")) {
+
+	@contents = <IN>;
+
+	unless (close(IN)) {
+
+	    print STDERR
+		  sprintf( "[error] Something weird: can't close file '%s': %s\n",
+			   $file, $! );
+
+	    print STDERR "[error] Aborting\n";
+	    exit(1);
+
+	}
+
+    }
+    else {
+
+	print STDERR sprintf( "[error] Can't open file '%s' for read: %s\n",
+			      $file, $! );
+	next;
+
+    }
+
+# parse data
+    my $data = $parser->decode(join('', @contents));
+    unless (defined $data) {
+
+	print STDERR sprintf( "[error] Data structure in file '%s' is invalid.\n",
+			      $file );
+
+	next;
+
+    }
+
+# import data
+    my $res = $dest->create_entity($data);
+    unless ($res) {
+
+	print STDERR
+	      "[error] Error on data import! Maybe entity already exists?\n";
+
+    }
+    else {
+
+	print "[info] Data successfully inserted.\n"
+				unless ($options->{'quiet'});
+
+    }
+
+}
