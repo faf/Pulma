@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.0.2";
+$VERSION = "0.0.3";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -523,7 +523,9 @@ while($request = CGI::Fast->new()) {
 	     cookie( -name => $cookie->{'name'} || 'pulma',
 		     -secure => $cookie->{'secure'} || 0,
 		     -httponly => $cookie->{'httponly'} || 0,
-		     -value => $cookie->{'value'} || 'pulma',
+		     -value => exists ($cookie->{'value'}) ?
+				$cookie->{'value'} :
+				'pulma',
 		     -path => $cookie->{'path'} || '/',
 		     -expires => ($cookie->{'delete'} ? '-' : '+') .
 				 ($cookie->{'expires'} || '120') . 's'));
