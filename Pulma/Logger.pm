@@ -28,4 +28,6 @@ use warnings;
 use Pulma::Data;
 our @ISA = ('Pulma::Data');
 
+my $cache_key = 'logger';
+
 1;

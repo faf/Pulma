@@ -30,6 +30,8 @@ use Pulma::Core::DB;
 use Pulma::Service::Functions;
 use Pulma::Service::Log;
 
+my $cache_key = 'data';
+
 =head1 Method: new
 
 =head2 Description
@@ -102,7 +104,7 @@ sub new {
 # set up data cache object if need to
     if ( exists($config->{'cache'}) && $config->{'cache'} eq 'memory' ) {
 
-	$self->{'cache'} = Pulma::Cacher::Data->new(\$cache);
+	$self->{'cache'} = Pulma::Cacher::Data->new(\$cache, $cache_key);
 
     }
 

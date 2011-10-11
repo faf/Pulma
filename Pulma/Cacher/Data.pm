@@ -39,6 +39,9 @@ Class constructor
 
 =item 1. (link to link to hash) standard memory cache
 
+=item 2. (string) cache part to store data to (hash key, optional, default
+key: 'common')
+
 =back
 
 =head2 Returns
@@ -55,9 +58,11 @@ sub new {
     my $package = shift;
     my $cache = shift;
     $cache = $$cache;
+    my $key = shift || 'common';
 
     my $self = {
-	'cache' => \$cache
+	'cache' => \$cache,
+	'key' => $key
     };
 
     return bless($self, $package);
@@ -95,16 +100,16 @@ sub get {
     my $time = shift;
 
 # look for entity with given id in cache
-    if (exists(${$self->{'cache'}}->{$id})) {
+    if (exists(${$self->{'cache'}->{$self->{'key'}}}->{$id})) {
 # check last modification time
-	if (${$self->{'cache'}}->{$id}->{'modtime'} < $time) {
+	if (${$self->{'cache'}->{$self->{'key'}}}->{$id}->{'modtime'} < $time) {
 # entity in cache obsolete - remove it from cache
 	    $self->del($id);
 	    return undef;
 	}
 	else {
 # actual entity found in cache
-	    return ${$self->{'cache'}}->{$id};
+	    return ${$self->{'cache'}->{$self->{'key'}}}->{$id};
 	}
     }
     else {
@@ -143,7 +148,7 @@ sub put {
     my $id = shift;
     my $data = shift;
 
-    %{${$self->{'cache'}}->{$id}} = %$data;
+    %{${$self->{'cache'}->{$self->{'key'}}}->{$id}} = %$data;
 
     return 1;
 }
@@ -176,7 +181,7 @@ sub del {
     my $self = shift;
     my $id = shift;
 
-    delete ${$self->{'cache'}}->{$id};
+    delete ${$self->{'cache'}->{$self->{'key'}}}->{$id};
 
     return 1;
 }
