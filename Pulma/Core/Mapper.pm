@@ -61,7 +61,8 @@ sub new {
     my $package = shift;
     my $config = shift;
 
-    my $self = {};
+# prepare object frame
+    my $self = { 'name' => __PACKAGE__ };
 
 # store configuration
     $self->{'config'} = $config;
@@ -123,7 +124,7 @@ sub steps {
 	$variants->{'default'} = $map->{'/default'};
     }
     else {
-	log_it('warning', __PACKAGE__ . '::steps: default steps missing!');
+	log_it('warning', $self->{'name'} . '::steps: default steps missing!');
     }
 
 # try to determine neccessary starting and finishing steps

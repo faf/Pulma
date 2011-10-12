@@ -64,7 +64,8 @@ sub new {
     my $config = shift;
 
     my $self = {
-	'config' => $config
+	'config' => $config,
+	'name' => __PACKAGE__
     };
 
 # initialize Templates Toolkit object

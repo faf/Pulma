@@ -66,7 +66,7 @@ sub new {
     my $package = shift;
     my $config = shift;
 
-    my $self = {};
+    my $self = { 'name' => __PACKAGE__ };
 
 # store configuration
     $self->{'config'} = $config;

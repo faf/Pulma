@@ -30,8 +30,6 @@ use Pulma::Core::DB;
 use Pulma::Service::Functions;
 use Pulma::Service::Log;
 
-my $cache_key = 'data';
-
 =head1 Method: new
 
 =head2 Description
@@ -68,13 +66,16 @@ sub new {
     my $cache = shift;
     $cache = $$cache;
 
-    my $self = { 'config' => $config };
+    my $self = {
+	'config' => $config,
+	'name' => __PACKAGE__
+    };
 
 # check for data source
     unless ($config->{'type'} eq 'localdb') {
 
 	log_it( 'err',
-		__PACKAGE__ . "::new: unknown backend type for object: %s",
+		$self->{'name'} . "::new: unknown backend type for object: %s",
 		$config->{'type'} );
 
 	return undef;
@@ -84,7 +85,7 @@ sub new {
 
 # data source: local DB
 
-	log_it('debug', __PACKAGE__ . '::new: initializing DB object');
+	log_it('debug', $self->{'name'} . '::new: initializing DB object');
 
 # initialize object to work with local DB
 	$self->{'db'} = Pulma::Core::DB->new($config->{'data'});
@@ -92,19 +93,19 @@ sub new {
 	unless (defined $self->{'db'}) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::new: failed to initialize DB object' );
+		    $self->{'name'} . '::new: failed to initialize DB object' );
 
 	    return undef;
 
 	}
 
-	log_it('debug', __PACKAGE__ . '::new: DB object initialized');
+	log_it('debug', $self->{'name'} . '::new: DB object initialized');
     }
 
 # set up data cache object if need to
     if ( exists($config->{'cache'}) && $config->{'cache'} eq 'memory' ) {
 
-	$self->{'cache'} = Pulma::Cacher::Data->new(\$cache, $cache_key);
+	$self->{'cache'} = Pulma::Cacher::Data->new( \$cache, $self->{'name'} );
 
     }
 
@@ -177,35 +178,40 @@ sub get_entity_by_id {
 	if (exists($entity->{'error'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::get_entity_by_id: got error when tried to get entity of type %s with id %s: %s',
+		    $self->{'name'} .
+			'::get_entity_by_id: got error when tried to get entity of type %s with id %s: %s',
 		    $etype, $id, $entity->{'error'} );
 
 	}
 	elsif (!scalar(@{$entity->{'data'}})) {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . '::get_entity_by_id: entity with id %s not found',
+		    $self->{'name'} .
+			'::get_entity_by_id: entity with id %s not found',
 		    $id );
 
 	}
 	elsif (scalar(@{$entity->{'data'}}) != 1) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::get_entity_by_id: something weird, got more than one entity with id %s',
+		    $self->{'name'} .
+			'::get_entity_by_id: something weird, got more than one entity with id %s',
 		    $id );
 
 	}
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . '::get_entity_by_id: successfully got entity by id %s',
+		    $self->{'name'} .
+			'::get_entity_by_id: successfully got entity by id %s',
 		    $id );
 
 # entity id is valid, look for this entity in cache
 	    if (exists($self->{'cache'})) {
 
 		log_it( 'debug',
-			__PACKAGE__ . '::get_entity_by_id: look for actual entity with id %s in cache',
+			$self->{'name'} .
+			    '::get_entity_by_id: look for actual entity with id %s in cache',
 			$id );
 
 		my $data = $self->{'cache'}->get( $id,
@@ -213,7 +219,8 @@ sub get_entity_by_id {
 		if (defined $data) {
 
 		    log_it( 'debug',
-			    __PACKAGE__ . '::get_entity_by_id: actual entity with id %s found in cache',
+			    $self->{'name'} .
+				'::get_entity_by_id: actual entity with id %s found in cache',
 			    $id );
 
 		    return $data;
@@ -222,7 +229,8 @@ sub get_entity_by_id {
 		else {
 
 		    log_it( 'debug',
-			    __PACKAGE__ . '::get_entity_by_id: actual entity with id %s not found in cache',
+			    $self->{'name'} .
+				'::get_entity_by_id: actual entity with id %s not found in cache',
 			    $id );
 
 		}
@@ -242,7 +250,8 @@ sub get_entity_by_id {
 	    if (exists($attributes->{'error'})) {
 
 		log_it( 'err',
-			__PACKAGE__ . '::get_entity_by_id: got error when tried to get attributes for an entity with id %s: %s',
+			$self->{'name'} .
+			    '::get_entity_by_id: got error when tried to get attributes for an entity with id %s: %s',
 			$id, $attributes->{'error'} );
 
 	    }
@@ -270,7 +279,8 @@ sub get_entity_by_id {
 	if ((defined $result) && (exists($self->{'cache'}))) {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . '::get_entity_by_id: stored entity with id %s in cache',
+		    $self->{'name'} .
+			'::get_entity_by_id: stored entity with id %s in cache',
 		    $id );
 
 	    $self->{'cache'}->put($id, $result);
@@ -283,7 +293,8 @@ sub get_entity_by_id {
     else {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::get_entity_by_id: unknown backend type %s, can't obtain data!",
+		$self->{'name'} .
+		    "::get_entity_by_id: unknown backend type %s, can't obtain data!",
 		$self->{'config'}->{'type'} );
 
 	return $result;
@@ -351,7 +362,8 @@ sub get_entities_count {
     else {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::get_entities_count: unknown backend type %s, can't obtain data!",
+		$self->{'name'} .
+		    "::get_entities_count: unknown backend type %s, can't obtain data!",
 		$self->{'config'}->{'type'} );
 
 	return 0;
@@ -408,7 +420,8 @@ sub get_entities {
     else {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::get_entities: unknown backend type %s, can't obtain data!",
+		$self->{'name'} .
+		    "::get_entities: unknown backend type %s, can't obtain data!",
 		$self->{'config'}->{'type'} );
 
 	return [];
@@ -469,7 +482,8 @@ sub sort_entities {
     unless (ref($entities) eq 'ARRAY') {
 
 	log_it( 'err',
-		__PACKAGE__ . '::sort_entities: invalid data supplied. Expected array, got %s. Nothing to sort',
+		$self->{'name'} .
+		    '::sort_entities: invalid data supplied. Expected array, got %s. Nothing to sort',
 		ref($entities) );
 
 	return $entities;
@@ -515,7 +529,8 @@ sub create_entity {
     if ($self->{'config'}->{'type'} ne 'localdb') {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::create_entity: unknown backend type %s, can't update data!",
+		$self->{'name'} .
+		    "::create_entity: unknown backend type %s, can't update data!",
 		$self->{'config'}->{'type'} );
 
 	return 0;
@@ -528,7 +543,8 @@ sub create_entity {
 	unless (exists($entity->{'etype'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::create_entity: attempt to create entity without type!' );
+		    $self->{'name'} .
+			'::create_entity: attempt to create entity without type!' );
 
 	    return 0;
 
@@ -541,7 +557,8 @@ sub create_entity {
 	$entity->{'modtime'} ||= time;
 
 	log_it( 'debug',
-		__PACKAGE__ . '::create_entity: creating entity with id %s and of type %s',
+		$self->{'name'} .
+		    '::create_entity: creating entity with id %s and of type %s',
 		$entity->{'id'}, $entity->{'etype'} );
 
 # check for entity with given id (there should be no duplicates)
@@ -552,7 +569,8 @@ sub create_entity {
 	if (exists($check->{'error'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::create_entity: can't check entity with id %s and of type %s for existance: %s",
+		    $self->{'name'} .
+			"::create_entity: can't check entity with id %s and of type %s for existance: %s",
 		    $entity->{'id'}, $entity->{'etype'}, $check->{'error'} );
 
 	    return 0;
@@ -561,7 +579,8 @@ sub create_entity {
 	elsif (scalar(@{$check->{'data'}}) != 1) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::create_entity: can't check entity with id %s and of type %s for existance: something weird occured. Expected 1 value, got %s value(s)",
+		    $self->{'name'} .
+			"::create_entity: can't check entity with id %s and of type %s for existance: something weird occured. Expected 1 value, got %s value(s)",
 		    $entity->{'id'}, $entity->{'etype'}, scalar(@{$check->{'data'}}) );
 
 	    return 0;
@@ -570,7 +589,8 @@ sub create_entity {
 	elsif ($check->{'data'}->[0]->{'count'} > 0) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::create_entity: can't create entity with id %s and of type %s: there is already entity with the same id! Got %s entity(ies).",
+		    $self->{'name'} .
+			"::create_entity: can't create entity with id %s and of type %s: there is already entity with the same id! Got %s entity(ies).",
 		    $entity->{'id'}, $entity->{'etype'}, $check->{'data'}->[0]->{'count'} );
 
 	    return 0;
@@ -579,7 +599,8 @@ sub create_entity {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::create_entity: entity with id %s and of type %s not found and thus can be created",
+		    $self->{'name'} .
+			"::create_entity: entity with id %s and of type %s not found and thus can be created",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	}
@@ -592,7 +613,8 @@ sub create_entity {
 	if (exists($res->{'error'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::create_entity: can't create entity with id %s and of type %s: %s",
+		    $self->{'name'} .
+			"::create_entity: can't create entity with id %s and of type %s: %s",
 		    $entity->{'id'}, $entity->{'etype'}, $res->{'error'} );
 
 	    return 0;
@@ -601,7 +623,8 @@ sub create_entity {
 	elsif (!$res->{'data'}) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::create_entity: can't create entity with id %s and of type %s: something went wrong",
+		    $self->{'name'} .
+			"::create_entity: can't create entity with id %s and of type %s: something went wrong",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	    return 0;
@@ -610,7 +633,8 @@ sub create_entity {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::create_entity: entity with id %s and of type %s successfully created",
+		    $self->{'name'} .
+			"::create_entity: entity with id %s and of type %s successfully created",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	}
@@ -620,7 +644,8 @@ sub create_entity {
 	if (!$self->_store_entity_attributes($entity)) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::create_entity: can't store some (or all) attributes for entity with id %s and of type %s!",
+		    $self->{'name'} .
+			"::create_entity: can't store some (or all) attributes for entity with id %s and of type %s!",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	    return 0;
@@ -629,14 +654,16 @@ sub create_entity {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::create_entity: attributes for entity with id %s and of type %s successfully stored",
+		    $self->{'name'} .
+			"::create_entity: attributes for entity with id %s and of type %s successfully stored",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 # put entity in cache (if need to)
 	    if (exists($self->{'cache'})) {
 
 		log_it( 'debug',
-			__PACKAGE__ . '::create_entity: store entity with id %s in cache',
+			$self->{'name'} .
+			    '::create_entity: store entity with id %s in cache',
 			$entity->{'id'} );
 
 		$self->{'cache'}->put($entity->{'id'}, $entity);
@@ -681,7 +708,8 @@ sub update_entity {
     if ($self->{'config'}->{'type'} ne 'localdb') {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::update_entity: unknown backend type %s, can't update data!",
+		$self->{'name'} .
+		    "::update_entity: unknown backend type %s, can't update data!",
 		$self->{'config'}->{'type'} );
 
 	return 0;
@@ -694,7 +722,8 @@ sub update_entity {
 	unless (exists($entity->{'id'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::update_entity: attempt to update entity without id!' );
+		    $self->{'name'} .
+			'::update_entity: attempt to update entity without id!' );
 
 	    return 0;
 
@@ -704,14 +733,16 @@ sub update_entity {
 	unless (exists($entity->{'etype'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::update_entity: attempt to update entity without type!' );
+		    $self->{'name'} .
+			'::update_entity: attempt to update entity without type!' );
 
 	    return 0;
 
 	}
 
 	log_it( 'debug',
-		__PACKAGE__ . '::update_entity: updating entity with id %s and of type %s',
+		$self->{'name'} .
+		    '::update_entity: updating entity with id %s and of type %s',
 		$entity->{'id'}, $entity->{'etype'} );
 
 # check entity's existance (by given id and type)
@@ -722,7 +753,8 @@ sub update_entity {
 	if (exists($check->{'error'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::update_entity: can't check entity with id %s and of type %s for existance: %s",
+		    $self->{'name'} .
+			"::update_entity: can't check entity with id %s and of type %s for existance: %s",
 		    $entity->{'id'}, $entity->{'etype'}, $check->{'error'} );
 
 	    return 0;
@@ -731,7 +763,8 @@ sub update_entity {
 	elsif (scalar(@{$check->{'data'}}) != 1) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::update_entity: can't check entity with id %s and of type %s for existance: something weird occured. Expected 1 value, got %s value(s)",
+		    $self->{'name'} .
+			"::update_entity: can't check entity with id %s and of type %s for existance: something weird occured. Expected 1 value, got %s value(s)",
 		    $entity->{'id'}, $entity->{'etype'}, scalar(@{$check->{'data'}}) );
 
 	    return 0;
@@ -740,7 +773,8 @@ sub update_entity {
 	elsif ($check->{'data'}->[0]->{'count'} > 1) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::update_entity: can't check entity with id %s and of type %s for existance: there are several (%s) entities with the same ids!",
+		    $self->{'name'} .
+			"::update_entity: can't check entity with id %s and of type %s for existance: there are several (%s) entities with the same ids!",
 		    $entity->{'id'}, $entity->{'etype'}, $check->{'data'}->[0]->{'count'} );
 
 	    return 0;
@@ -749,7 +783,8 @@ sub update_entity {
 	elsif (!$check->{'data'}->[0]->{'count'}) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::update_entity: can't update entity with id %s and of type %s: no such entity!",
+		    $self->{'name'} .
+			"::update_entity: can't update entity with id %s and of type %s: no such entity!",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	    return 0;
@@ -758,7 +793,8 @@ sub update_entity {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::update_entity: entity with id %s and of type %s exists and unique",
+		    $self->{'name'} .
+			"::update_entity: entity with id %s and of type %s exists and unique",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	}
@@ -767,7 +803,8 @@ sub update_entity {
 	if (!$self->_delete_entity_attributes($entity)) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::update_entity: can't delete attributes for entity with id %s and of type %s!",
+		    $self->{'name'} .
+			"::update_entity: can't delete attributes for entity with id %s and of type %s!",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	    return 0;
@@ -776,14 +813,16 @@ sub update_entity {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::update_entity: attributes for entity with id %s and of type %s successfully deleted",
+		    $self->{'name'} .
+			"::update_entity: attributes for entity with id %s and of type %s successfully deleted",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	}
 
 # try to set new time of the last modification for the entity
 	log_it( 'debug',
-		__PACKAGE__ . '::update_entity: setting new last modification time for entity with id %s and of type %s',
+		$self->{'name'} .
+		    '::update_entity: setting new last modification time for entity with id %s and of type %s',
 		$entity->{'id'}, $entity->{'etype'} );
 
 	$entity->{'modtime'} = time;
@@ -795,7 +834,8 @@ sub update_entity {
 	if (exists($res->{'error'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::update_entity: can't set new last modification time for entity with id %s and of type %s: %s",
+		    $self->{'name'} .
+			"::update_entity: can't set new last modification time for entity with id %s and of type %s: %s",
 		    $entity->{'id'}, $entity->{'etype'}, $res->{'error'} );
 
 	    return 0;
@@ -804,7 +844,8 @@ sub update_entity {
 	elsif (!$res->{'data'}) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::update_entity: can't set new last modification time for entity with id %s and of type %s: something weird happened",
+		    $self->{'name'} .
+			"::update_entity: can't set new last modification time for entity with id %s and of type %s: something weird happened",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	    return 0;
@@ -813,7 +854,8 @@ sub update_entity {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::update_entity: new last modification time for entity with id %s and of type %s successfully set",
+		    $self->{'name'} .
+			"::update_entity: new last modification time for entity with id %s and of type %s successfully set",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	}
@@ -822,7 +864,8 @@ sub update_entity {
 	if (!$self->_store_entity_attributes($entity)) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::update_entity: can't store some (or all) attributes for entity with id %s and of type %s!",
+		    $self->{'name'} .
+			"::update_entity: can't store some (or all) attributes for entity with id %s and of type %s!",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	    return 0;
@@ -831,14 +874,16 @@ sub update_entity {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::update_entity: attributes for entity with id %s and of type %s successfully stored",
+		    $self->{'name'} .
+			"::update_entity: attributes for entity with id %s and of type %s successfully stored",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 # put entity in cache (if need to)
 	    if (exists($self->{'cache'})) {
 
 		log_it( 'debug',
-			__PACKAGE__ . '::update_entity: store entity with id %s in cache',
+			$self->{'name'} .
+			    '::update_entity: store entity with id %s in cache',
 			$entity->{'id'} );
 
 		$self->{'cache'}->put($entity->{'id'}, $entity);
@@ -883,7 +928,8 @@ sub delete_entity {
     if ($self->{'config'}->{'type'} ne 'localdb') {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::delete_entity: unknown backend type %s, can't delete data!",
+		$self->{'name'} .
+		    "::delete_entity: unknown backend type %s, can't delete data!",
 		$self->{'config'}->{'type'} );
 
 	return 0;
@@ -896,7 +942,8 @@ sub delete_entity {
 	unless (exists($entity->{'id'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::delete_entity: attempt to delete entity without id!' );
+		    $self->{'name'} .
+			'::delete_entity: attempt to delete entity without id!' );
 
 	    return 0;
 
@@ -905,7 +952,8 @@ sub delete_entity {
 	unless (exists($entity->{'etype'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::delete_entity: attempt to delete entity without type!' );
+		    $self->{'name'} .
+			'::delete_entity: attempt to delete entity without type!' );
 
 	    return 0;
 
@@ -913,7 +961,8 @@ sub delete_entity {
 
 # try to delete entity
 	log_it( 'debug',
-		__PACKAGE__ . '::delete_entity: deleting entity with id %s and of type %s',
+		$self->{'name'} .
+		    '::delete_entity: deleting entity with id %s and of type %s',
 		$entity->{'id'}, $entity->{'etype'} );
 
 	my $res = $self->{'db'}->execute( {'select' => 0, 'cache' => 1},
@@ -923,7 +972,8 @@ sub delete_entity {
 	if (exists($res->{'error'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::delete_entity: can't delete entity with id %s and of type %s: %s",
+		    $self->{'name'} .
+			"::delete_entity: can't delete entity with id %s and of type %s: %s",
 		    $entity->{'id'}, $entity->{'etype'}, $res->{'error'} );
 
 	    return 0;
@@ -932,7 +982,8 @@ sub delete_entity {
 	elsif (!$res->{'data'}) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::delete_entity: can't delete entity with id %s and of type %s: something went wrong",
+		    $self->{'name'} .
+			"::delete_entity: can't delete entity with id %s and of type %s: something went wrong",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	    return 0;
@@ -941,7 +992,8 @@ sub delete_entity {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::delete_entity: entity with id %s and of type %s successfully deleted from entities table",
+		    $self->{'name'} .
+			"::delete_entity: entity with id %s and of type %s successfully deleted from entities table",
 		    $entity->{'id'}, $entity->{'etype'} );
 
 	}
@@ -950,14 +1002,16 @@ sub delete_entity {
 	if ($self->_delete_entity_attributes($entity)) {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::delete_entity: attributes for deleted entity with id %s successfully deleted",
+		    $self->{'name'} .
+			"::delete_entity: attributes for deleted entity with id %s successfully deleted",
 		    $entity->{'id'} );
 
 	}
 	else {
 
 	    log_it( 'warning',
-		    __PACKAGE__ . "::delete_entity: unable to delete attributes for deleted entity with id %s",
+		    $self->{'name'} .
+			"::delete_entity: unable to delete attributes for deleted entity with id %s",
 		    $entity->{'id'} );
 
 	}
@@ -966,7 +1020,8 @@ sub delete_entity {
 	if (exists($self->{'cache'})) {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . '::delete_entity: deleting entity with id %s from cache',
+		    $self->{'name'} .
+			'::delete_entity: deleting entity with id %s from cache',
 		    $entity->{'id'} );
 
 	    $self->{'cache'}->del($entity->{'id'});
@@ -1045,7 +1100,8 @@ sub delete_entities {
     else {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::delete_entities: unknown backend type %s, can't obtain data!",
+		$self->{'name'} .
+		    "::delete_entities: unknown backend type %s, can't obtain data!",
 		$self->{'config'}->{'type'} );
 
     }
@@ -1074,7 +1130,8 @@ sub _get_entities_from_localdb {
     unless (ref($filters) eq 'ARRAY') {
 
 	log_it( 'err',
-		__PACKAGE__ . '::_get_entities_from_localdb: invalid filters supplied. Expected array, got %s, filters ignored',
+		$self->{'name'} .
+		    '::_get_entities_from_localdb: invalid filters supplied. Expected array, got %s, filters ignored',
 		ref($filters) );
 
 	return [];
@@ -1096,7 +1153,8 @@ sub _get_entities_from_localdb {
 	    unless (ref($filter) eq 'ARRAY') {
 
 		log_it( 'err',
-			__PACKAGE__ . '::_get_entities_from_localdb: invalid filter supplied. Expected array, got %s, filter ignored',
+			$self->{'name'} .
+			    '::_get_entities_from_localdb: invalid filter supplied. Expected array, got %s, filter ignored',
 			ref($filter) );
 		next;
 
@@ -1111,7 +1169,8 @@ sub _get_entities_from_localdb {
 		     !$self->_check_filter_operation($condition->{'op'}) ) {
 
 		    log_it( 'err',
-			    __PACKAGE__ . '::_get_entities_from_localdb: invalid condition supplied, omitted' );
+			    $self->{'name'} .
+				'::_get_entities_from_localdb: invalid condition supplied, omitted' );
 
 		}
 		else {
@@ -1132,7 +1191,8 @@ sub _get_entities_from_localdb {
 	    if (exists($res->{'error'})) {
 
 		log_it( 'err',
-			__PACKAGE__ . '::_get_entities_from_localdb: got DB error %s, filter ignored',
+			$self->{'name'} .
+			    '::_get_entities_from_localdb: got DB error %s, filter ignored',
 			$res->{'error'} );
 
 		next;
@@ -1143,7 +1203,8 @@ sub _get_entities_from_localdb {
 	    unless (scalar(@{$res->{'data'}})) {
 
 		log_it( 'debug',
-			__PACKAGE__ . '::_get_entities_from_localdb: no entities for filter, skip remaining filters' );
+			$self->{'name'} .
+			    '::_get_entities_from_localdb: no entities for filter, skip remaining filters' );
 
 		return [];
 
@@ -1173,7 +1234,8 @@ sub _get_entities_from_localdb {
 	    unless (scalar(keys(%$results))) {
 
 		log_it( 'debug',
-			__PACKAGE__ . "::_get_entities_from_localdb: no entities after filters' results intersection, skip remaining filters" );
+			$self->{'name'} .
+			    "::_get_entities_from_localdb: no entities after filters' results intersection, skip remaining filters" );
 
 		return [];
 
@@ -1194,14 +1256,16 @@ sub _get_entities_from_localdb {
 	if (exists($res->{'error'})) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::_get_entities_from_localdb: got DB error %s, can't obtain all entities of type %s",
+		    $self->{'name'} .
+			"::_get_entities_from_localdb: got DB error %s, can't obtain all entities of type %s",
 		    $res->{'error'}, $etype );
 
 	}
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::_get_entities_from_localdb: obtained all entities of type %s",
+		    $self->{'name'} .
+			"::_get_entities_from_localdb: obtained all entities of type %s",
 		    $etype );
 
 	    foreach (@{$res->{'data'}}) {
@@ -1234,7 +1298,8 @@ sub _store_entity_attributes {
     if ($self->{'config'}->{'type'} ne 'localdb') {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::_store_entity_attributes: unknown backend type %s, can't store attributes!",
+		$self->{'name'} .
+		    "::_store_entity_attributes: unknown backend type %s, can't store attributes!",
 		$self->{'config'}->{'type'} );
 
 	return 0;
@@ -1250,7 +1315,8 @@ sub _store_entity_attributes {
     unless (ref($entity->{'attributes'}) eq 'HASH') {
 
 	log_it( 'err',
-		__PACKAGE__ . "::_store_entity_attributes: invalid entity structure. Expected hash of attributes, got %s",
+		$self->{'name'} .
+		    "::_store_entity_attributes: invalid entity structure. Expected hash of attributes, got %s",
 		ref($entity->{'attributes'}) );
 
 	return 0;
@@ -1264,7 +1330,8 @@ sub _store_entity_attributes {
 	unless (ref($entity->{'attributes'}->{$attribute}) eq 'ARRAY') {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::_store_entity_attributes: invalid entity structure. Expected array of %s attribute values, got %s",
+		    $self->{'name'} .
+			"::_store_entity_attributes: invalid entity structure. Expected array of %s attribute values, got %s",
 		    $attribute, ref($entity->{'attributes'}->{$attribute}) );
 
 	    $result &&= 0;
@@ -1284,10 +1351,9 @@ sub _store_entity_attributes {
 	    if (exists($res->{'error'})) {
 
 		log_it( 'err',
-			__PACKAGE__ . "::_store_entity_attributes: can't store attribute %s for entity with id %s: %s",
-			$attribute,
-			$entity->{'id'},
-			$res->{'error'} );
+			$self->{'name'} .
+			    "::_store_entity_attributes: can't store attribute %s for entity with id %s: %s",
+			$attribute, $entity->{'id'}, $res->{'error'} );
 
 		$result &&= 0;
 
@@ -1295,7 +1361,8 @@ sub _store_entity_attributes {
 	    elsif (!$res->{'data'}) {
 
 		log_it( 'err',
-			__PACKAGE__ . "::_store_entity_attributes: can't store attribute %s for entity with id %s: something went wrong",
+			$self->{'name'} .
+			    "::_store_entity_attributes: can't store attribute %s for entity with id %s: something went wrong",
 			$attribute, $entity->{'id'} );
 
 		$result &&= 0;
@@ -1304,7 +1371,8 @@ sub _store_entity_attributes {
 	    else {
 
 		log_it( 'debug',
-			__PACKAGE__ . "::_store_entity_attributes: attribute %s for entity with id %s successfully stored",
+			$self->{'name'} .
+			    "::_store_entity_attributes: attribute %s for entity with id %s successfully stored",
 			$attribute, $entity->{'id'} );
 
 	    }
@@ -1330,7 +1398,8 @@ sub _delete_entity_attributes {
     if ($self->{'config'}->{'type'} ne 'localdb') {
 
 	log_it( 'warning',
-		__PACKAGE__ . "::_delete_entity_attributes: unknown backend type %s, can't delete attributes!",
+		$self->{'name'} .
+		    "::_delete_entity_attributes: unknown backend type %s, can't delete attributes!",
 		$self->{'config'}->{'type'} );
 
 	return 0;
@@ -1347,7 +1416,8 @@ sub _delete_entity_attributes {
     if (exists($res->{'error'})) {
 
 	log_it( 'err',
-		__PACKAGE__ . "::_delete_entity_attributes: can't delete attributes for deleted entity with id %s: %s",
+		$self->{'name'} .
+		    "::_delete_entity_attributes: can't delete attributes for deleted entity with id %s: %s",
 		$entity->{'id'}, $res->{'error'} );
 
 	return 0;
@@ -1356,7 +1426,8 @@ sub _delete_entity_attributes {
     elsif (!$res->{'data'}) {
 
 	log_it( 'err',
-		__PACKAGE__ . "::_delete_entity_attributes: can't delete attributes for deleted entity with id %s: something went wrong",
+		$self->{'name'} .
+		    "::_delete_entity_attributes: can't delete attributes for deleted entity with id %s: something went wrong",
 		$entity->{'id'} );
 
 	return 0;
@@ -1365,7 +1436,8 @@ sub _delete_entity_attributes {
     else {
 
 	log_it( 'debug',
-		__PACKAGE__ . "::_delete_entity_attributes: attributes for deleted entity with id %s successfully deleted",
+		$self->{'name'} .
+		    "::_delete_entity_attributes: attributes for deleted entity with id %s successfully deleted",
 		$entity->{'id'} );
 
     }

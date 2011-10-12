@@ -87,20 +87,21 @@ sub new {
 # store configuration
     my $self = {
 	'config' => $config,
-	'output' => $output
+	'output' => $output,
+	'name' => __PACKAGE__
     };
 
     if (exists($config->{'logger'})) {
 
 # initialize logger object (if need to)
 
-	log_it('debug',  __PACKAGE__ . '::new: initializing logger object');
+	log_it('debug',  $self->{'name'} . '::new: initializing logger object');
 
 	$self->{'logger'} = Pulma::Logger->new($config->{'logger'}, \$cache);
 	unless (defined $self->{'logger'}) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::new: can't initialize logger object!" );
+		    $self->{'name'} . "::new: can't initialize logger object!" );
 
 	    return undef;
 
@@ -112,13 +113,13 @@ sub new {
 
 # initialize data object (if need to)
 
-	log_it('debug',  __PACKAGE__ . '::new: initializing data object');
+	log_it('debug',  $self->{'name'} . '::new: initializing data object');
 
 	$self->{'data'} = Pulma::Data->new($config->{'data'}, \$cache);
 	unless (defined $self->{'data'}) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::new: can't initialize data object!" );
+		    $self->{'name'} . "::new: can't initialize data object!" );
 
 	    return undef;
 
@@ -130,13 +131,13 @@ sub new {
 
 # initialize auth object (if need to)
 
-	log_it('debug',  __PACKAGE__ . '::new: initializing auth object');
+	log_it('debug',  $self->{'name'} . '::new: initializing auth object');
 
 	$self->{'auth'} = Pulma::Auth->new($config->{'auth'}, \$cache);
 	unless (defined $self->{'auth'}) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::new: can't initialize auth object!" );
+		    $self->{'name'} . "::new: can't initialize auth object!" );
 
 	    return undef;
 
@@ -145,7 +146,7 @@ sub new {
     }
 
 # initialize parser object for data encoding / decoding
-    log_it('debug', __PACKAGE__ . '::new: initializing parser object');
+    log_it('debug', $self->{'name'} . '::new: initializing parser object');
 
     $self->{'parser'} = Pulma::Service::Data::Parser->new({});
 

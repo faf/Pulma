@@ -60,7 +60,8 @@ sub new {
     my $self = {
 	'filename' => $filename,
 	'lasttime' => undef,
-	'content' => []
+	'content' => [],
+	'name' => __PACKAGE__
     };
 
     return bless($self, $package);
@@ -109,14 +110,15 @@ sub get {
     unless (-r $self->{'filename'}) {
 
 	log_it( 'err',
-		__PACKAGE__ . '::get: file %s not readable, return old content',
+		$self->{'name'} .
+		    '::get: file %s not readable, return old content',
 		$self->{'filename'} );
 
     }
     else {
 
 	log_it( 'debug',
-		__PACKAGE__ . '::get: file %s is readable',
+		$self->{'name'} . '::get: file %s is readable',
 		$self->{'filename'} );
 
 # get time of last modification of the file
@@ -129,13 +131,15 @@ sub get {
 # file was already stored in cache, check if stored data is obsolete
 
 	    log_it( 'debug',
-		    __PACKAGE__ . '::get: last change of file %s is %s', $self->{'filename'},
+		    $self->{'name'} .
+			'::get: last change of file %s is %s', $self->{'filename'},
 		    $timestamp );
 
 	    unless ($self->{'lasttime'} < $timestamp) {
 
 		log_it( 'debug',
-			__PACKAGE__ . '::get: old change time is %s, should keep old content',
+			$self->{'name'} .
+			    '::get: old change time is %s, should keep old content',
 			$self->{'lasttime'} );
 		$old = 0;
 
@@ -143,7 +147,8 @@ sub get {
 	    else {
 
 		log_it( 'debug',
-			__PACKAGE__ . '::get: old change time is %s, should update content',
+			$self->{'name'} .
+			    '::get: old change time is %s, should update content',
 			$self->{'lasttime'} );
 
 	    }
@@ -152,7 +157,7 @@ sub get {
 
 # first time call
 	    log_it( 'debug',
-		    __PACKAGE__ . '::get: first read of file %s',
+		    $self->{'name'} . '::get: first read of file %s',
 		    $self->{'filename'} );
 
 	}
@@ -163,7 +168,8 @@ sub get {
 	    if ($self->_read_file()) {
 
 		log_it( 'debug',
-			__PACKAGE__ . '::get: everything fine, update last change time'
+			$self->{'name'} .
+			    '::get: everything fine, update last change time'
 		);
 
 		$self->{'lasttime'} = $timestamp;
@@ -173,7 +179,8 @@ sub get {
 	    else {
 
 		log_it( 'debug',
-			__PACKAGE__ . "::get: something went wrong, don't update last change time");
+			$self->{'name'} .
+			    "::get: something went wrong, don't update last change time" );
 
 	    }
 	}
@@ -203,7 +210,7 @@ sub _read_file {
     unless (-r $file) {
 
 	log_it( 'err',
-		__PACKAGE__ . '::_read_file: file %s not readable',
+		$self->{'name'} . '::_read_file: file %s not readable',
 		$file );
 
 	return 0;
@@ -212,7 +219,7 @@ sub _read_file {
     else {
 
 	log_it( 'debug',
-		__PACKAGE__ . '::_read_file: file %s is readable',
+		$self->{'name'} . '::_read_file: file %s is readable',
 		$file );
 
     }
@@ -222,26 +229,27 @@ sub _read_file {
     if (open(IN, '<', $file)) {
 
 	log_it( 'debug',
-		__PACKAGE__ . '::_read_file: successfully opened file %s',
+		$self->{'name'} . '::_read_file: successfully opened file %s',
 		$file );
 
 	@content = <IN>;
 
 	log_it( 'debug',
-		__PACKAGE__ . '::_read_file: got file %s contents',
+		$self->{'name'} . '::_read_file: got file %s contents',
 		$file );
 
 	unless (close(IN)) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . '::_read_file: can\'t close file %s: %s',
+		    $self->{'name'} . '::_read_file: can\'t close file %s: %s',
 		    $file, $! );
 
 	}
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . '::_read_file: successfully closed file %s',
+		    $self->{'name'} .
+			'::_read_file: successfully closed file %s',
 		    $file );
 
 	}
@@ -255,7 +263,8 @@ sub _read_file {
     else {
 
 	log_it( 'err',
-		__PACKAGE__ . '::_read_file: can\'t open file %s for read: %s',
+		$self->{'name'} .
+		    '::_read_file: can\'t open file %s for read: %s',
 		$file, $! );
 
 	return 0;

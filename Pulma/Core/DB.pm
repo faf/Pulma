@@ -82,7 +82,8 @@ sub new {
     my $self = {
 	'connection' => undef,
 	'requests' => {},
-	'config' => $config
+	'config' => $config,
+	'name' => __PACKAGE__
     };
 
     $self = bless($self, $package);
@@ -91,7 +92,7 @@ sub new {
     unless ($self->_connect()) {
 
         log_it( 'err',
-		__PACKAGE__ . "::new: can't connect to DB: %s",
+		$self->{'name'} . "::new: can't connect to DB: %s",
 		$DBI::errstr );
 
 	unbless $self;
@@ -100,7 +101,7 @@ sub new {
 
     }
 
-    log_it('debug',  __PACKAGE__ . '::new: connected to DB');
+    log_it('debug',  $self->{'name'} . '::new: connected to DB');
 
     return $self;
 }
@@ -215,14 +216,15 @@ sub _request {
     my $result = {};
 
     log_it( 'debug',
-	    __PACKAGE__ . "::_request: request: %s, args: %s, params: %s",
+	    $self->{'name'} . "::_request: request: %s, args: %s, params: %s",
 	    $request, Dumper(\@args), Dumper(\$params) );
 
 # check DB connection
     unless (defined $self->{'connection'}) {
 
 	log_it( 'debug',
-		__PACKAGE__  . "::_request: connection to DB is dead. Try to restore." );
+		$self->{'name'}  .
+		    "::_request: connection to DB is dead. Try to restore." );
 
 	unless($self->_connect()) {
 
@@ -232,7 +234,8 @@ sub _request {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::_request: connection to DB restored." );
+		    $self->{'name'} .
+			"::_request: connection to DB restored." );
 
 	}
 
@@ -244,7 +247,8 @@ sub _request {
 	$self->{'requests'}->{$request} = $self->{'connection'}->prepare($request);
 
 	log_it( 'debug',
-		__PACKAGE__ . "::_request: request '%s' to DB prepared",
+		$self->{'name'} .
+		    "::_request: request '%s' to DB prepared",
 		$request );
 
     }
@@ -257,14 +261,16 @@ sub _request {
 	$result->{'error'} = $self->{'connection'}->errstr();
 
 	log_it( 'info',
-		__PACKAGE__ . "::_request: request '%s' preparation to DB failed. Error: %s",
+		$self->{'name'} .
+		    "::_request: request '%s' preparation to DB failed. Error: %s",
 		$request, $result->{'error'} );
 
 	unless ( $params->{'_retry'} || $self->{'connection'}->ping() ) {
 
 # it was first try and DB connection is dead (ping failed) - retry
 	    log_it( 'debug',
-		    __PACKAGE__ . "_request: connection to DB is dead. Try to execute request '%s' once again.",
+		    $self->{'name'} .
+			"_request: connection to DB is dead. Try to execute request '%s' once again.",
 		    $request );
 
 	    return $self->_retry($result, $params, $request, @args);
@@ -277,7 +283,8 @@ sub _request {
 
 # execute request
     log_it( 'debug',
-	    __PACKAGE__ . "::_request: executing request '%s' to DB",
+	    $self->{'name'} .
+		"::_request: executing request '%s' to DB",
 	    $request );
 
     my $success = $self->{'requests'}->{$request}->execute(@args) ? 1 : 0;
@@ -285,14 +292,16 @@ sub _request {
 
 # request execution succeed
 	log_it( 'debug',
-		__PACKAGE__ . "::_request: request '%s' to DB executed successfully",
+		$self->{'name'} .
+		    "::_request: request '%s' to DB executed successfully",
 		$request );
 
 	$result->{'data'} = [];
 	if ($params->{'select'}) {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::_request: obtaining data after selective request '%s' to DB",
+		    $self->{'name'} .
+			"::_request: obtaining data after selective request '%s' to DB",
 		    $request );
 
 # for selective request - obtain resulting data and place it into resulting hash
@@ -307,11 +316,13 @@ sub _request {
 		$result->{'error'} = $self->{'requests'}->{$request}->errstr();
 
 		log_it( 'info',
-			__PACKAGE__ . "::_request: obtaining data after request '%s' to DB failed. Error: %s",
+			$self->{'name'} .
+			    "::_request: obtaining data after request '%s' to DB failed. Error: %s",
 			$request, $result->{'error'} );
 
 		log_it( 'debug',
-			__PACKAGE__ . "::_request: rolling back all changes made to DB" );
+			$self->{'name'} .
+			    "::_request: rolling back all changes made to DB" );
 
 		$self->{'connection'}->rollback();
 
@@ -319,7 +330,8 @@ sub _request {
 # it was first try and DB connection is dead (ping failed) - retry
 
 		    log_it( 'debug',
-			    __PACKAGE__ . "::_request: connection to DB is dead. Try to execute request '%s' once again.",
+			    $self->{'name'} .
+				"::_request: connection to DB is dead. Try to execute request '%s' once again.",
 			    $request );
 
 		    return $self->_retry($result, $params, $request, @args);
@@ -331,7 +343,8 @@ sub _request {
 
 # everything fine, data from selective result obtained - commit changes to DB
 		log_it( 'debug',
-			__PACKAGE__ . "::_request: commiting data after selective request '%s' to DB",
+			$self->{'name'} .
+			    "::_request: commiting data after selective request '%s' to DB",
 			$request );
 
 		$self->{'connection'}->commit();
@@ -343,7 +356,8 @@ sub _request {
 	    $result->{'data'} = 1;
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::_request: commiting data after non-selective request '%s' to DB",
+		    $self->{'name'} .
+			"::_request: commiting data after non-selective request '%s' to DB",
 		    $request );
 
 	    $self->{'connection'}->commit();
@@ -358,18 +372,21 @@ sub _request {
 	$result->{'error'} = $self->{'requests'}->{$request}->errstr();
 
 	log_it( 'info',
-		__PACKAGE__ . "::_request: execution of request '%s' to DB failed. Error: %s",
+		$self->{'name'} .
+		    "::_request: execution of request '%s' to DB failed. Error: %s",
 		$request, $result->{'error'} );
 
 	log_it( 'debug',
-		__PACKAGE__ . "::_request: rolling back all changes made to DB" );
+		$self->{'name'} .
+		    "::_request: rolling back all changes made to DB" );
 
 	$self->{'connection'}->rollback();
 	unless ( $params->{'_retry'} || $self->{'connection'}->ping() ) {
 # it was first try and DB connection is dead (ping failed) - retry
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::_request: connection to DB is dead. Try to execute request '%s' once again.",
+		    $self->{'name'} .
+			"::_request: connection to DB is dead. Try to execute request '%s' once again.",
 		    $request );
 
 	    return $self->_retry($result, $params, $request, @args);
@@ -414,14 +431,16 @@ sub _retry {
     my @args = @_;
 
     log_it( 'debug',
-	    __PACKAGE__ . "::_retry: second try for request: %s, args: %s, params: %s",
+	    $self->{'name'} .
+		"::_retry: second try for request: %s, args: %s, params: %s",
 	    $request, Dumper(\@args), Dumper(\$params) );
 
 # try to reconnect to DB
     unless ($self->_reconnect()) {
 
 	log_it( 'debug',
-		__PACKAGE__ . "::_retry: reconnection to DB failed. Second try for request '%s' failed.",
+		$self->{'name'} .
+		    "::_retry: reconnection to DB failed. Second try for request '%s' failed.",
 		$request );
 
 	return $old_result;
@@ -430,7 +449,8 @@ sub _retry {
 
 # reconnection succeed, try to execute SQL-request for the second time
     log_it( 'debug',
-	    __PACKAGE__ . "::_retry: reconnection to DB succeed. Launch second try for request '%s'",
+	    $self->{'name'} .
+		"::_retry: reconnection to DB succeed. Launch second try for request '%s'",
 	    $request );
 
     $params->{'_retry'} = 1;
@@ -449,7 +469,7 @@ sub _retry {
 sub _reconnect {
     my $self = shift;
 
-    log_it('debug', __PACKAGE__ . "::_reconnect: reconnecting to DB");
+    log_it('debug', $self->{'name'} . "::_reconnect: reconnecting to DB");
 
     return $self->_disconnect() && $self->_connect();
 }
@@ -465,7 +485,7 @@ sub _reconnect {
 sub _connect {
     my $self = shift;
 
-    log_it('debug', __PACKAGE__ . "::_connect: connecting to DB");
+    log_it('debug', $self->{'name'} . "::_connect: connecting to DB");
 
     my $result = undef;
     eval {
@@ -482,7 +502,7 @@ sub _connect {
 							  } ) ) {
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::_connect: can't connect to DB: %s",
+		    $self->{'name'} . "::_connect: can't connect to DB: %s",
 		    $DBI::errstr );
 
 	    $result = 0;
@@ -491,7 +511,8 @@ sub _connect {
 	else {
 
 	    log_it( 'debug',
-		    __PACKAGE__ . "::_connect: successfully connected to DB" );
+		    $self->{'name'} .
+			"::_connect: successfully connected to DB" );
 
 	    $result = 1;
 
@@ -502,7 +523,7 @@ sub _connect {
     unless (defined $result) {
 
 	log_it( 'err',
-		__PACKAGE__ . "::_connect: can't connect to DB: %s",
+		$self->{'name'} . "::_connect: can't connect to DB: %s",
 		$@ );
 
 	$result = 0;
@@ -523,25 +544,27 @@ sub _connect {
 sub _disconnect {
     my $self = shift;
 
-    log_it('debug', __PACKAGE__ . "::_disconnect: disconnecting from DB");
+    log_it('debug', $self->{'name'} . "::_disconnect: disconnecting from DB");
 
     if (defined $self->{'connection'}) {
 
 # rollback all uncommited changes
 	log_it( 'debug',
-		__PACKAGE__ . "::_disconnect: rolling back all changes made to DB" );
+		$self->{'name'} .
+		    "::_disconnect: rolling back all changes made to DB" );
 
 	my $res = $self->{'connection'}->rollback();
 
 	log_it( 'err',
-		__PACKAGE__ . "::_disconnect: error while rolling back changes: %s",
+		$self->{'name'} .
+		    "::_disconnect: error while rolling back changes: %s",
 		$self->errstr() ) unless $res;
 
     }
 
 # finish all cached requests for a given DB
     log_it( 'debug',
-	    __PACKAGE__ . "::_disconnect: finishing all requests to DB" );
+	    $self->{'name'} . "::_disconnect: finishing all requests to DB" );
 
     foreach my $req (keys %{$self->{'requests'}}) {
 
@@ -550,7 +573,8 @@ sub _disconnect {
 	    my $res = $self->{'requests'}->{$req}->finish();
 
 	    log_it( 'err',
-		    __PACKAGE__ . "::_disconnect: error while finishing request: %s",
+		    $self->{'name'} .
+			"::_disconnect: error while finishing request: %s",
 		    $self->errstr() ) unless $res; # hope, this works as i thought
 
 	}
@@ -563,7 +587,8 @@ sub _disconnect {
     if (defined $self->{'connection'}) {
 
 	log_it( 'debug',
-		__PACKAGE__ . "::_disconnect: finally closing connection to DB" );
+		$self->{'name'} .
+		    "::_disconnect: finally closing connection to DB" );
 
 	my $res = $self->{'connection'}->disconnect() ? 1 : 0;
 
@@ -575,7 +600,8 @@ sub _disconnect {
     else {
 
 	log_it( 'debug',
-		__PACKAGE__ . "::_disconnect: connection to DB is already closed" );
+		$self->{'name'} .
+		    "::_disconnect: connection to DB is already closed" );
 
 	return 1;
 
@@ -593,7 +619,7 @@ sub _disconnect {
 sub DESTROY {
     my $self = shift;
 
-    log_it('debug', __PACKAGE__ . '::DESTROY: DB object destruction');
+    log_it('debug', $self->{'name'} . '::DESTROY: DB object destruction');
 
 # correctly close DB connection
     $self->_disconnect();

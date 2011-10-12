@@ -63,7 +63,7 @@ sub new {
     my $config = shift;
 
 # setup configuration
-    my $self = { 'config' => $config };
+    my $self = { 'config' => $config, 'name' => __PACKAGE__ };
 
 # setup JSON parser
     $self->{'parser'} = JSON::XS->new();
@@ -111,7 +111,7 @@ sub encode {
     };
     if ($@) {
 
-	log_it('err', __PACKAGE__ . '::encode: fail to encode: %s', $@);
+	log_it('err', $self->{'name'} . '::encode: fail to encode: %s', $@);
 
 	$string = undef;
 
@@ -119,7 +119,7 @@ sub encode {
     elsif (ref($string)) {
 
 	log_it( 'err',
-		__PACKAGE__ . '::encode: fail to encode: got result as %s',
+		$self->{'name'} . '::encode: fail to encode: got result as %s',
 		ref($string) );
 
 	$string = undef;
@@ -128,7 +128,7 @@ sub encode {
     else {
 
 	log_it( 'debug',
-		__PACKAGE__ . '::encode: successfully encoded data' );
+		$self->{'name'} . '::encode: successfully encoded data' );
 
     }
 
@@ -173,7 +173,7 @@ sub decode {
     };
     if ($@) {
 
-	log_it('err', __PACKAGE__ . '::decode: fail to decode: %s', $@);
+	log_it('err', $self->{'name'} . '::decode: fail to decode: %s', $@);
 
 	$data = undef;
 
@@ -181,7 +181,7 @@ sub decode {
     elsif ((ref($data) ne 'HASH') && (ref($data) ne 'ARRAY')) {
 
 	log_it( 'err',
-		__PACKAGE__ . '::decode: fail to decode: got result as %s',
+		$self->{'name'} . '::decode: fail to decode: got result as %s',
 		ref($data) );
 
 	$data = undef;
@@ -190,7 +190,7 @@ sub decode {
     else {
 
 	log_it( 'debug',
-		__PACKAGE__ . '::decode: successfully decoded data' );
+		$self->{'name'} . '::decode: successfully decoded data' );
 
     }
 

@@ -62,10 +62,47 @@ sub new {
 
     my $self = {
 	'cache' => \$cache,
-	'key' => $key
+	'key' => $key,
+	'name' => __PACKAGE__
     };
 
     return bless($self, $package);
+}
+
+=head1 Method: set_key
+
+=head2 Description
+
+Method to set cache part to use
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) cache part to store data to
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 on success I<or> 0 on error
+
+=back
+
+=cut
+
+sub set_key {
+    my $self = shift;
+    my $key = shift;
+
+# check key value
+    return 0 unless defined $key;
+
+    $self->{'key'} = $key;
+
+    return 1;
 }
 
 =head1 Method: get
@@ -100,16 +137,16 @@ sub get {
     my $time = shift;
 
 # look for entity with given id in cache
-    if (exists(${$self->{'cache'}->{$self->{'key'}}}->{$id})) {
+    if (exists(${$self->{'cache'}}->{$self->{'key'}}->{$id})) {
 # check last modification time
-	if (${$self->{'cache'}->{$self->{'key'}}}->{$id}->{'modtime'} < $time) {
+	if (${$self->{'cache'}}->{$self->{'key'}}->{$id}->{'modtime'} < $time) {
 # entity in cache obsolete - remove it from cache
 	    $self->del($id);
 	    return undef;
 	}
 	else {
 # actual entity found in cache
-	    return ${$self->{'cache'}->{$self->{'key'}}}->{$id};
+	    return ${$self->{'cache'}}->{$self->{'key'}}->{$id};
 	}
     }
     else {
@@ -148,7 +185,7 @@ sub put {
     my $id = shift;
     my $data = shift;
 
-    %{${$self->{'cache'}->{$self->{'key'}}}->{$id}} = %$data;
+    %{${$self->{'cache'}}->{$self->{'key'}}->{$id}} = %$data;
 
     return 1;
 }
@@ -181,7 +218,7 @@ sub del {
     my $self = shift;
     my $id = shift;
 
-    delete ${$self->{'cache'}->{$self->{'key'}}}->{$id};
+    delete ${$self->{'cache'}}->{$self->{'key'}}->{$id};
 
     return 1;
 }

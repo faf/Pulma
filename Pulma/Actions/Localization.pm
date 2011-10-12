@@ -59,6 +59,8 @@ sub new {
 
     my $self = $package->SUPER::new(@_);
 
+    $self->{'name'} = __PACKAGE__;
+
     return $self;
 }
 

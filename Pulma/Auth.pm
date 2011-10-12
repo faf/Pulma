@@ -28,6 +28,44 @@ use warnings;
 use Pulma::Data;
 our @ISA = ('Pulma::Data');
 
-my $cache_key = 'auth';
+=head1 Method: new
+
+=head2 Description
+
+Class constructor
+
+=head2 Argument(s)
+
+=over
+
+=item see Pulma::Data class
+
+=back
+
+=head2 Returns
+
+=over
+
+=item see Pulma::Data class
+
+=back
+
+=cut
+
+sub new {
+    my $package = shift;
+
+    my $self = $package->SUPER::new(@_);
+
+# set actual object name
+    $self->{'name'} = __PACKAGE__;
+
+# set cache key if need to
+    if (exists($self->{'cache'})) {
+	$self->{'cache'}->set_key($self->{'name'});
+    }
+
+    return $self;
+}
 
 1;
