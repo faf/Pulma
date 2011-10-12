@@ -44,6 +44,8 @@ Class constructor
 
 =item 2. (link to link to hash) cache hash
 
+=item 3. (string) real package name (optional)
+
 =back
 
 =head2 Returns
@@ -65,10 +67,11 @@ sub new {
     my $config = shift;
     my $cache = shift;
     $cache = $$cache;
+    my $name = shift || __PACKAGE__;
 
     my $self = {
 	'config' => $config,
-	'name' => __PACKAGE__
+	'name' => $name
     };
 
 # check for data source
@@ -87,8 +90,9 @@ sub new {
 
 	log_it('debug', $self->{'name'} . '::new: initializing DB object');
 
-# initialize object to work with local DB
-	$self->{'db'} = Pulma::Core::DB->new($config->{'data'});
+# initialize object to work with local DB (or get it from cache if exists)
+	$self->{'db'} = $cache->{$self->{'name'} . '_db'} ||
+			    Pulma::Core::DB->new($config->{'data'});
 
 	unless (defined $self->{'db'}) {
 
@@ -106,6 +110,9 @@ sub new {
     if ( exists($config->{'cache'}) && $config->{'cache'} eq 'memory' ) {
 
 	$self->{'cache'} = Pulma::Cacher::Data->new( \$cache, $self->{'name'} );
+
+# store local DB connection into cache
+	$cache->{$self->{'name'} . '_db'} ||= $self->{'db'};
 
     }
 

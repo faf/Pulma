@@ -440,7 +440,7 @@ see function B<escapeHTML> in CGI module
 =cut
 
 sub escape {
-    return escapeHTML(@_);
+    return escapeHTML(@_) || '';
 }
 
 =head1 Function: generate_entity_id

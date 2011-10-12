@@ -55,15 +55,7 @@ Class constructor
 sub new {
     my $package = shift;
 
-    my $self = $package->SUPER::new(@_);
-
-# set actual object name
-    $self->{'name'} = __PACKAGE__;
-
-# set cache key if need to
-    if (exists($self->{'cache'})) {
-	$self->{'cache'}->set_key($self->{'name'});
-    }
+    my $self = $package->SUPER::new(@_, __PACKAGE__);
 
     return $self;
 }
