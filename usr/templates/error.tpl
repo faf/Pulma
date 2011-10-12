@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="[% GET pulma.data.language.code %]">
+<html lang="[% GET pulma.locale %]">
     <head>
 	<meta charset="UTF-8">
 	<title>[% GET pulma.data.error.code %] [% GET pulma.data.error.title %]</title>
