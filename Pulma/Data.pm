@@ -558,7 +558,8 @@ sub create_entity {
 	}
 
 # set entity id (if need to)
-	$entity->{'id'} ||= generate_entity_id($entity->{'etype'});
+	$entity->{'id'} ||= generate_entity_id( $entity->{'etype'},
+						$self->{'config'}->{'nodeid'} );
 
 # set entity last modification time
 	$entity->{'modtime'} ||= time;
@@ -1485,31 +1486,58 @@ sub _check_filter_operation {
 #	or -1 if second entity should stand before first entity
 
 sub _compare_attributes {
-    my $a = shift;
-    my $b = shift;
+    my $first = shift;
+    my $second = shift;
     my $name = shift;
     my $order = shift;
 
-# in case of multiple values compare only first ones
-# TODO: improve this
-    my @attrsa = sort(@{$a->{'attributes'}->{$name}});
-    my @attrsb = sort(@{$b->{'attributes'}->{$name}});
+# (in case of multiple values compare only first ones)
+    my @attrsa;
+    my @attrsb;
+
+# initialize entities' attributes to sort by if they're not defined
+    if ( !defined($first->{'attributes'}->{$name}) ) {
+	$first->{'attributes'}->{$name} = [];
+    }
+    if ( !defined($second->{'attributes'}->{$name}) ) {
+	$second->{'attributes'}->{$name} = [];
+    }
 
 # ascendant sort with symbolic comparsion
     if ($order eq 'asc') {
+
+	@attrsa = sort { $a cmp $b } (@{$first->{'attributes'}->{$name}});
+	@attrsb = sort { $a cmp $b } (@{$second->{'attributes'}->{$name}});
+
 	return $attrsa[0] || '' cmp $attrsb[0] || '';
+
     }
 # descendant sort with symbolic comparsion
     elsif ($order eq 'desc') {
+
+	@attrsa = sort { $b cmp $a } (@{$first->{'attributes'}->{$name}});
+	@attrsb = sort { $b cmp $a } (@{$second->{'attributes'}->{$name}});
+
 	return $attrsb[0] || '' cmp $attrsa[0] || '';
+
     }
 # ascendant sort with numeric comparsion
     elsif ($order eq 'nasc') {
+
+	@attrsa = sort { $a <=> $b } (@{$first->{'attributes'}->{$name}});
+	@attrsb = sort { $a <=> $b } (@{$second->{'attributes'}->{$name}});
+
 	return 0 + ($attrsa[0] || 0) <=> 0 + ($attrsb[0] || 0);
+
     }
 # descendant sort with numeric comparsion
     elsif ($order eq 'ndesc') {
+
+	@attrsa = sort { $b <=> $a } (@{$first->{'attributes'}->{$name}});
+	@attrsb = sort { $b <=> $a } (@{$second->{'attributes'}->{$name}});
+
 	return 0 + ($attrsb[0] || 0) <=> 0 + ($attrsa[0] || 0);
+
     }
     return 0;
 }

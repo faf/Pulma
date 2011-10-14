@@ -456,6 +456,9 @@ random value
 
 =item 1. (string) entity type
 
+=item 2. (string) salt (optional, by default there will be generated random
+string with length of 8 symbols)
+
 =back
 
 =head2 Returns
@@ -471,7 +474,8 @@ random value
 sub generate_entity_id {
     my $type = shift;
     my $time = time;
-    my $salt = generate_rnd_string(7);
+    my $salt = shift || generate_rnd_string(7);
+    $salt .= generate_rnd_string(7);
     return md5_hex($type . $time . $salt);
 }
 

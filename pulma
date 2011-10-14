@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.0.3";
+$VERSION = "0.0.4";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -371,6 +371,12 @@ my $objects = {};
 # common built-in cache
 my $cache = {};
 
+# add 'nodeid' value to configuration of all data sources (for future generation
+# of entity ids)
+foreach ('auth', 'data', 'logger') {
+    $config->{$_}->{'nodeid'} = $config->{'fcgi'}->{'nodeid'};
+}
+
 # initialize requests counter
 my $cnt = 0;
 
@@ -446,6 +452,12 @@ while($request = CGI::Fast->new()) {
 		    log_it( 'err',
 			    "Failed to require module %s : %s",
 			    $step->{'details'}->{'module'}, $@ );
+
+# remove bad module from INC hash (to try to load it once again without need
+# of full framework restart)
+		    my $temp = $step->{'details'}->{'module'};
+		    $temp =~ s~::~/~g;
+		    delete($INC{$temp . '.pm'});
 
 		    next;
 
@@ -561,6 +573,7 @@ while($request = CGI::Fast->new()) {
 
 # post-request operations
     pm_post_dispatch();
+
 }
 
 END {
