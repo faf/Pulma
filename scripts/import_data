@@ -79,7 +79,6 @@ if ( !exists($options->{'config'}) || !scalar(@files) ) {
 
 }
 
-
 if ( !exists($options->{'to'}) ) {
 
     pod2usage(-exitval => 0, -verbose => 2);
@@ -87,7 +86,6 @@ if ( !exists($options->{'to'}) ) {
 }
 
 # check specified configuration file
-
 unless (-r $options->{'config'}) {
 
     print STDERR
@@ -98,7 +96,6 @@ unless (-r $options->{'config'}) {
 }
 
 # get configuration
-
 my $config = do($options->{'config'});
 if ($@) {
 
