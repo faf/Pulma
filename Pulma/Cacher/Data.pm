@@ -25,6 +25,8 @@ package Pulma::Cacher::Data;
 use strict;
 use warnings;
 
+use Clone qw( clone );
+
 use Pulma::Service::Log;
 
 =head1 Method: new
@@ -146,7 +148,7 @@ sub get {
 	}
 	else {
 # actual entity found in cache
-	    return ${$self->{'cache'}}->{$self->{'key'}}->{$id};
+	    return clone( ${$self->{'cache'}}->{$self->{'key'}}->{$id} );
 	}
     }
     else {
@@ -185,7 +187,7 @@ sub put {
     my $id = shift;
     my $data = shift;
 
-    %{${$self->{'cache'}}->{$self->{'key'}}->{$id}} = %$data;
+    ${$self->{'cache'}}->{$self->{'key'}}->{$id} = clone($data);
 
     return 1;
 }
