@@ -188,6 +188,8 @@ sub action {
     my $data = shift;
     my $specs = shift;
 
+    log_it('debug', $self->{'name'} . '::action: invoked');
+
     return $data;
 }
 

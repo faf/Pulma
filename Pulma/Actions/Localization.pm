@@ -26,6 +26,7 @@ use strict;
 use warnings;
 
 use Pulma::Service::Constants;
+use Pulma::Service::Log;
 
 use Pulma::Actions::Prototype;
 our @ISA = ('Pulma::Actions::Prototype');
@@ -105,6 +106,8 @@ locale value and data object as data source
 sub action {
     my $self = shift;
     my $data = shift;
+
+    log_it('debug', $self->{'name'} . '::action: invoked');
 
     $data->{'pulma'}->{'locale'} = $data->{'request'}->{'params'}->{'locale'}->[0]
 				   || $data->{'request'}->{'cookies'}->{'locale'}->[0]
