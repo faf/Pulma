@@ -31,14 +31,15 @@ our @ISA = ('Exporter');
 our @EXPORT = qw( &calculate_password_hash &calculate_password_strength
 		  &check_color &check_date &check_email &check_login
 		  &check_number &check_sum &check_uri &escape &generate_entity_id
-		  &generate_rnd_string &pager &truncate_string &uri_escape
-		  &uri_escape_utf8 &uri_unescape );
+		  &generate_rnd_string &make_http_date &pager &truncate_string
+		  &uri_escape &uri_escape_utf8 &uri_unescape );
 
 use CGI::Fast qw(:standard);
 use Digest::MD5 qw(md5_hex);
 use Digest::SHA1 qw(sha1_hex);
 use Email::Valid;
 use Encode qw(_utf8_on _utf8_off);
+use HTTP::Date;
 use Regexp::Common qw(URI);
 use URI::Escape;
 
@@ -521,6 +522,36 @@ sub generate_rnd_string {
     }
 
     return $str;
+}
+
+=head1 Function: make_http_date
+
+=head2 Description
+
+Function to provide valid date in HTTP format (see rfc1123)
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (integer) epoch time in seconds (optional, default: current time)
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (string) date in HTTP format
+
+=back
+
+=cut
+
+sub make_http_date {
+    my $time = shift;
+
+    return $time ? time2str($time) : time2str();
 }
 
 =head1 Function: pager
