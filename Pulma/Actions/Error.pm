@@ -25,6 +25,9 @@ package Pulma::Actions::Error;
 use strict;
 use warnings;
 
+use Pulma::Service::Constants;
+use Pulma::Service::Log;
+
 use Pulma::Actions::Prototype;
 our @ISA = ('Pulma::Actions::Prototype');
 
@@ -121,16 +124,17 @@ sub action {
     my $data = shift;
     my $specs = shift;
 
-    my $error = $self->{'errors'}->{'default'};
-    if ( exists($specs->{'code'}) &&
-	 exists($self->{'errors'}->{$specs->{'code'}}) ) {
+    log_it('debug', $self->{'name'} . '::action: invoked');
 
-	$data->{'result'}->{'status'} = $specs->{'code'};
-	$data->{'pulma'}->{'data'}->{'error'}->{'title'} = $self->{'errors'}->{$specs->{'code'}}->{'title'};
-	$data->{'pulma'}->{'data'}->{'error'}->{'text'} = $self->{'errors'}->{$specs->{'code'}}->{'text'};
-	$data->{'pulma'}->{'data'}->{'error'}->{'code'} = $specs->{'code'};
+    my $error = ( exists($specs->{'code'}) &&
+		  exists($self->{'errors'}->{$specs->{'code'}}) ) ?
+		$self->{'errors'}->{$specs->{'code'}} :
+		$self->{'errors'}->{'default'};
 
-    }
+    $data->{'result'}->{'status'} = $specs->{'code'} || ERROR;
+    $data->{'pulma'}->{'data'}->{'error'}->{'title'} = $error->{'title'};
+    $data->{'pulma'}->{'data'}->{'error'}->{'text'} = $error->{'text'};
+    $data->{'pulma'}->{'data'}->{'error'}->{'code'} = $specs->{'code'} || ERROR;
 
     $data->{'result'}->{'template'} = 'error.tpl';
 
@@ -142,7 +146,8 @@ sub action {
 
 	    'time'	=> [ time ],
 	    'aentity'	=> [ exists($data->{'pulma'}->{'auth'}->{'user'}->{'id'}) ? $data->{'pulma'}->{'auth'}->{'user'}->{'id'} : 0 ],
-	    'dentity'	=> [ 0 ],
+	    'dentity'	=> [ exists($data->{'pulma'}->{'dentity'}) ? $data->{'pulma'}->{'dentity'}->{'id'} || 0 : 0 ],
+	    'dtype'	=> [ exists($data->{'pulma'}->{'dentity'}) ? $data->{'pulma'}->{'dentity'}->{'etype'} || '' : '' ],
 	    'code'	=> [ $data->{'result'}->{'status'} ],
 	    'url'	=> [ $data->{'request'}->{'url'} ],
 	    'fullurl'	=> [ $data->{'request'}->{'fullurl'} ],
