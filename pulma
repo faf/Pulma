@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.0.5";
+$VERSION = "0.0.6";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -411,7 +411,8 @@ while($request = CGI::Fast->new()) {
 	    'document' => '',
 	    'use_output' => 1,
 	    'headers' => {}
-	}
+	},
+	'stop' => 0
     };
 
 # pass data structure through all handlers (step by step)
@@ -509,6 +510,9 @@ while($request = CGI::Fast->new()) {
 			       ($step->{'data'} ? 1 : 0) .
 			       ($step->{'logger'} ? 1 : 0)}->action( $data,
 			    					     $step->{'details'}->{'data'} || {} );
+
+# stop if module at this step explicitly say that
+	    last if $data->{'stop'};
 
 	}
 
