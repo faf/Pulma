@@ -156,6 +156,8 @@ sub steps {
 	'after' => []
     };
 
+# TODO: add restriction by path
+
 # take into account all restrictions for all chains of steps (default, found,
 # starting and finishing)
     foreach ('default', 'real', 'before', 'after') {
