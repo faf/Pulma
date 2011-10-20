@@ -121,7 +121,7 @@ sub action {
 
     if ( ($data->{'pulma'}->{'locale'} ne 'en') &&
 	($data->{'result'}->{'status'} != REDIRECT) &&
-	!($data->{'result'}->{'binmode'}) ) {
+	!$data->{'result'}->{'binary_data'} ) {
 
 	$data->{'pulma'}->{'data'} = $self->_translate( $data->{'pulma'}->{'locale'},
 							$data->{'pulma'}->{'data'} );
@@ -162,18 +162,51 @@ sub _translate {
     }
     elsif (!ref($tree)) {
 # incoming data is scalar value - translate value by getting appropriate data
-
-	return $self->{'data'}->get_entities( [ [ { 'name' => 'value',
-						    'value' => $tree,
-						    'op' => '=' } ],
-						[ { 'name' => 'locale',
-						    'value' => $locale,
-						    'op' => '=' } ] ],
-						'translation' )->[0]->{'attributes'}->{'translation'}->[0] || $tree;
-
+	$tree = $self->_translate_value($locale, $tree);
     }
 
     return $tree;
+}
+
+# Method: _translate_value
+# Description
+#	Method to translate scalar value
+# Argument(s)
+#	1. (string) locale code
+#	2. (string) scalar value
+# Returns
+#	(custom) translated value
+
+sub _translate_value {
+    my $self = shift;
+    my $locale = shift;
+    my $value = shift;
+
+    my $translation = $self->{'data'}->get_entities( [ [ { 'name' => 'value',
+							   'value' => $value,
+							   'op' => '=' } ],
+						     [ { 'name' => 'locale',
+							 'value' => $locale,
+							 'op' => '=' } ] ],
+						     'translation' )->[0]->{'attributes'}->{'translation'}->[0];
+
+    if ($translation) {
+# localized constant found
+	return $translation;
+    }
+    else {
+# localized constant not found - place it into data storage to prevent from
+# new searches
+	$self->{'data'}->create_entity( { 'etype' => 'translation',
+					  'attributes' => {
+						'value' => [ $value ],
+						'locale' => [ $locale ],
+						'translation' => [ $value ]
+					} } );
+
+	return $value;
+    }
+
 }
 
 1;
