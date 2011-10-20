@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.0.6";
+$VERSION = "0.0.7";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -53,6 +53,7 @@ BEGIN {
 
 use CGI::Cookie;
 use CGI::Fast qw(remote_addr header cookie redirect cgi_error escapeHTML);
+use Encode qw(_utf8_off);
 use FCGI::ProcManager qw(pm_manage pm_pre_dispatch pm_post_dispatch);
 use POSIX;
 
@@ -406,10 +407,10 @@ while($request = CGI::Fast->new()) {
 	    'status' => ERROR,
 	    'mime_type' => 'text/html; charset=UTF-8',
 	    'cookies' => [],
-	    'binmode' => 0,
 	    'template' => '500.html',
 	    'document' => '',
 	    'use_output' => 1,
+	    'binary_data' => 0,
 	    'headers' => {}
 	},
 	'stop' => 0
@@ -427,7 +428,7 @@ while($request = CGI::Fast->new()) {
 # check step type and details
 	unless ($step->{'type'} eq 'module') {
 
-	    log_it( 'warn',
+	    log_it( 'warning',
 		    "Step is of type %s which is currently unsupported",
 		    $step->{'type'} );
 
@@ -554,11 +555,16 @@ while($request = CGI::Fast->new()) {
     }
     else {
         print header($data->{'result'}->{'headers'});
-# set binary mode if need to
-	if ($data->{'result'}->{'binmode'}) {
+
+	my $document = $data->{'result'}->{'document'} || '';
+	if ($data->{'result'}->{'binary_data'}) {
 	    binmode(STDOUT);
 	}
-	print $data->{'result'}->{'document'} || '';
+	else {
+	    binmode(STDOUT, ":utf8");
+	    _utf8_off($document);
+	}
+	print $document;
     }
 
 # write brief info about request into system log

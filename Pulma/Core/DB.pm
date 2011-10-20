@@ -490,16 +490,25 @@ sub _connect {
     my $result = undef;
     eval {
 
+	my $options = { RaiseError => 0,
+			PrintError => 0,
+			AutoCommit => 0,
+			ChopBlanks => 1
+	};
+
+	if ($self->{'config'}->{'driver'} eq 'SQLite') {
+	    $options->{sqlite_unicode} = 1;
+	}
+	elsif ($self->{'config'}->{'driver'} eq 'mysql') {
+	    $options->{mysql_enable_utf8} = 1;
+	}
+
 	unless ( $self->{'connection'} = DBI->connect(
 						    'dbi:' . $self->{'config'}->{'driver'} .
 						    ':' . $self->{'config'}->{'dsn'},
-							  $self->{'config'}->{'user'},
-							  $self->{'config'}->{'passwd'},
-							  { RaiseError => 0,
-							    PrintError => 0,
-							    AutoCommit => 0,
-							    ChopBlanks => 1
-							  } ) ) {
+						    $self->{'config'}->{'user'},
+						    $self->{'config'}->{'passwd'},
+						    $options ) ) {
 
 	    log_it( 'err',
 		    $self->{'name'} . "::_connect: can't connect to DB: %s",

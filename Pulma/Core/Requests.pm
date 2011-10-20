@@ -28,6 +28,7 @@ use warnings;
 use CGI::Cookie;
 use CGI::Fast qw(:standard);
 use Digest::MD5 qw(md5_hex);
+use Encode qw(decode_utf8);
 
 =head1 Method: new
 
@@ -239,6 +240,13 @@ sub _get_params {
 	else {
 	    my @temp = param($param);
 	    $res->{$param} = \@temp;
+	}
+    }
+
+# utf-decode
+    foreach my $param (keys %$res) {
+	foreach (@{$res->{$param}}) {
+	    $_ = decode_utf8( $_ ) if (ref($_) ne 'Fh');
 	}
     }
 

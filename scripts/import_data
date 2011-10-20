@@ -32,6 +32,7 @@ use Pulma::Logger;
 
 use Pulma::Service::Data::Parser;
 
+use Encode;
 use Getopt::Long qw(:config no_ignore_case bundling no_auto_abbrev);
 use Pod::Usage;
 
@@ -164,7 +165,7 @@ foreach my $file (@files) {
 
 # read data from file
     my @contents;
-    if (open(IN, "<$file")) {
+    if (open(IN, "<:encoding(utf-8)", $file)) {
 
 	@contents = <IN>;
 
