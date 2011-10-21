@@ -182,6 +182,8 @@ sub _translate_value {
     my $locale = shift;
     my $value = shift;
 
+    return $value unless defined $value;
+
     my $translation = $self->{'data'}->get_entities( [ [ { 'name' => 'value',
 							   'value' => $value,
 							   'op' => '=' } ],
