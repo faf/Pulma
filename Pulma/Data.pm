@@ -522,7 +522,7 @@ Method to create new entity
 
 =over
 
-=item 1 on success I<or> 0 on error
+=item entity id on success I<or> 0 on error
 
 =back
 
@@ -678,7 +678,7 @@ sub create_entity {
 
 	    }
 
-	    return 1;
+	    return $entity->{'id'};
 
 	}
     }
@@ -1156,7 +1156,7 @@ sub _get_entities_from_localdb {
 	my $first = 1;
 	foreach my $filter (@$filters) {
 # construct DB request for the filter
-	    my $request = 'select distinct(entity) from attributes as a, entities as b where b.id = a.entity and etype = ? and (';
+	    my $request = 'select distinct(entity) from attributes as a, entities as b where b.id = a.entity and etype = ?';
 	    my @args = ($etype);
 	    unless (ref($filter) eq 'ARRAY') {
 
@@ -1183,14 +1183,14 @@ sub _get_entities_from_localdb {
 		}
 		else {
 
-		    $request .= (scalar(@args) == 1 ? '' : ' or ') .
+		    $request .= (scalar(@args) == 1 ? ' and (' : ' or ') .
 				'(name = ? and val ' . $condition->{'op'} .
 				' ?)';
 		    push (@args, $condition->{'name'}, $condition->{'value'});
 
 		}
 	    }
-	    $request .= ')';
+	    $request .= ')' if (scalar(@args) != 1);
 
 # request construction completed, try to get entities
 	    my $res = $self->{'db'}->execute( {'select' => 1, 'cache' => 1},
