@@ -559,7 +559,7 @@ sub make_http_date {
 =head2 Description
 
 Function to build a navigation structure for pager based upon incoming data
-structure (pretending that pager containts maximum 10 links to pages)
+structure
 
 =head2 Argument(s)
 
@@ -585,7 +585,9 @@ structure (pretending that pager containts maximum 10 links to pages)
 
     'count' => <overall number of items>,
 
-    'page' => <current page>
+    'page' => <current page>,
+
+    ['links' => <number of links to pages> (optional, default: 10)]
 
 }
 
@@ -620,24 +622,36 @@ sub pager {
 	'items' => $data->{'count'}
     };
 
-    if ($pager->{'pages_count'} > 9) {
+# check page value, set to 0 if greater than it could be
+    $pager->{'page'} = ($pager->{'page'} < $pager->{'pages_count'}) ?
+			$pager->{'page'} :
+			0;
 
-	$pager->{'beg'} = ($pager->{'page'} < 4) ? 0 : ($pager->{'page'}  - 4);
+    my $links = $data->{'links'} || 10;
 
-	$pager->{'end'} = (($pager->{'pages_count'} - $pager->{'page'}) > 5) ?
-			    ($pager->{'page'} + 4) :
+    my $links_left = int($links / 2) - 1 + 1 * ($links % 2);
+    my $links_right = int($links / 2);
+
+    if ($pager->{'pages_count'} > ($links - 1)) {
+
+	$pager->{'beg'} = ($pager->{'page'} < $links_left) ?
+			  0 :
+			  ($pager->{'page'} - $links_left);
+
+	$pager->{'end'} = (($pager->{'pages_count'} - $pager->{'page'}) > $links_right) ?
+			    ($pager->{'page'} + $links_right) :
 			    ($pager->{'pages_count'} - 1);
 
-	if (($pager->{'end'} - $pager->{'beg'})<8) {
+	if (($pager->{'end'} - $pager->{'beg'}) < $links) {
 
 	    if ($pager->{'end'} == ($pager->{'pages_count'} - 1)) {
 
-		    $pager->{'beg'} = $pager->{'end'} - 8;
+		    $pager->{'beg'} = $pager->{'end'} - $links + 1;
 
 	    }
 	    else {
 
-		    $pager->{'end'} = $pager->{'beg'} + 8;
+		    $pager->{'end'} = $pager->{'beg'} + $links - 1;
 
 	    }
 	}
