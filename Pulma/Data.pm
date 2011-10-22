@@ -313,7 +313,8 @@ sub get_entity_by_id {
 
 =head2 Description
 
-Method to get count of entities of a given type and (maybe) filtered by some criteria
+Method to get count of entities of a given type and (maybe) filtered/sorted by
+some criteria
 
 =head2 Argument(s)
 
@@ -349,8 +350,22 @@ All conditions are optional. Each condition is a hash:
 
 { 'name' => <name>, 'op' => <operation>, 'value' => <value> }
 
+B<or>
+
+{ 'name' => <name>, 'sort' => (asc|desc) }
+
 where <name> is a name of entity's attribute, <value> is the value of that
 attribute, and <operation> is one of '=', '<=', '>=', '<', '>'
+
+B<IMPORTANT!> One should be aware that (at least for localdb backend) sorting
+will work for the values of I<all> attributes used in condition, not only for
+the one specified in sort condition. If more accurate (but more slow
+and resource-hungry) sorting needed, one should use B<sort_entities> method
+instead.
+
+B<IMPORTANT!> Note that sorting conditions overrides each other (even in
+different filters). So there is no reasons to use more than one such condition
+for filters. Use B<sort_entities> method instead.
 
 =cut
 
@@ -392,6 +407,10 @@ Method to get entities of a given type and (maybe) filtered by some criteria
 
 =item 2. (string) entities' type
 
+=item 3. (integer) entities limit (optional, default: no limits)
+
+=item 4. (integer) offset (optional, default: no offset)
+
 =back
 
 =head2 Returns
@@ -409,10 +428,15 @@ sub get_entities {
     my $self = shift;
     my $filters = shift;
     my $etype = shift;
+    my $limit = shift || 0;
+    my $offset = shift || 0;
 
     if ($self->{'config'}->{'type'} eq 'localdb') {
 
-	my $entities = $self->_get_entities_from_localdb($filters, $etype);
+	my $entities = $self->_get_entities_from_localdb( $filters,
+							  $etype,
+							  $limit,
+							  $offset );
 	my $result = [];
 
 	foreach my $entity (@$entities) {
@@ -1124,8 +1148,10 @@ sub delete_entities {
 #	Get entities of a given type and (maybe) filtered by some criteria
 #	using local database as a data source
 # Argument(s)
-#	1. (link to array) filters to choose entities
+#	1. (link to array) filters to choose (and (maybe) sort) entities
 #	2. (string) entities' type
+#	3. (integer) entities limit (optional, default: no limits)
+#	4. (integer) offset (optional, default: no offset)
 # Returns
 #	(link to array) entities (as an array of ids)
 
@@ -1133,6 +1159,8 @@ sub _get_entities_from_localdb {
     my $self = shift;
     my $filters = shift;
     my $etype = shift;
+    my $limit = shift || 0;
+    my $offset = shift || 0;
 
 # validate structure of filters (should be array)
     unless (ref($filters) eq 'ARRAY') {
@@ -1158,6 +1186,7 @@ sub _get_entities_from_localdb {
 # construct DB request for the filter
 	    my $request = 'select distinct(entity) from attributes as a, entities as b where b.id = a.entity and etype = ?';
 	    my @args = ($etype);
+	    my $sort = '';
 	    unless (ref($filter) eq 'ARRAY') {
 
 		log_it( 'err',
@@ -1173,8 +1202,9 @@ sub _get_entities_from_localdb {
 
 		if ( (ref($condition) ne 'HASH') ||
 		     !exists($condition->{'name'}) ||
-		     !exists($condition->{'value'}) ||
-		     !$self->_check_filter_operation($condition->{'op'}) ) {
+		     ( !exists($condition->{'value'}) ||
+		       !$self->_check_filter_operation($condition->{'op'}) ) &&
+		     !exists($condition->{'sort'}) ) {
 
 		    log_it( 'err',
 			    $self->{'name'} .
@@ -1183,14 +1213,29 @@ sub _get_entities_from_localdb {
 		}
 		else {
 
-		    $request .= (scalar(@args) == 1 ? ' and (' : ' or ') .
-				'(name = ? and val ' . $condition->{'op'} .
-				' ?)';
-		    push (@args, $condition->{'name'}, $condition->{'value'});
+		    $request .= (scalar(@args) == 1) ? ' and (' : ' or ';
+
+		    if (exists($condition->{'value'})) {
+
+			$request .= '(name = ? and val ' . $condition->{'op'} .
+				    ' ?)';
+			push (@args, $condition->{'name'}, $condition->{'value'});
+
+		    }
+		    else {
+
+			$request .= '( name = ? )';
+			push (@args, $condition->{'name'});
+			$sort = ' order by val ' .
+				( ($condition->{'sort'} eq 'desc') ?
+				  'desc' :
+				  'asc' );
+
+		    }
 
 		}
 	    }
-	    $request .= ')' if (scalar(@args) != 1);
+	    $request .= ')' . $sort if (scalar(@args) != 1);
 
 # request construction completed, try to get entities
 	    my $res = $self->{'db'}->execute( {'select' => 1, 'cache' => 1},
@@ -1218,10 +1263,11 @@ sub _get_entities_from_localdb {
 
 	    }
 
+	    my $count = 1;
 	    my $new_results = {};
 	    foreach (@{$res->{'data'}}) {
 
-		$new_results->{$_->{'entity'}} = 1;
+		$new_results->{$_->{'entity'}} = ($sort ne '') ? $count++ : $count;
 
 	    }
 
@@ -1232,6 +1278,16 @@ sub _get_entities_from_localdb {
 		    unless (exists($results->{$key})) {
 			delete($new_results->{$key});
 		    }
+		}
+
+# sorting results
+		my @keys = sort { ($results->{$a} == $results->{$b}) ?
+				    $new_results->{$a} <=> $new_results->{$b} :
+				    $results->{$a} <=> $results->{$b} } keys(%$new_results);
+
+		$count = 0;
+		foreach (@keys) {
+		    $new_results->{$_} = $count++;
 		}
 	    }
 
@@ -1284,8 +1340,22 @@ sub _get_entities_from_localdb {
 
     }
 
-# finally return ids of all filtered entities
-    my @result = keys(%$results);
+# finally return ids of filtered entities
+
+# sort entities
+    my @result = sort {$results->{$a} <=> $results->{$b} } keys(%$results);
+
+# apply limit and offset (if need to)
+    if ($limit != 0) {
+	if (scalar(@result) > $limit) {
+	    if ($offset < scalar(@result)) {
+		@result = splice(@result, $offset, $limit);
+	    }
+	    else {
+		@result = ();
+	    }
+	}
+    }
 
     return \@result;
 }
@@ -1509,7 +1579,7 @@ sub _compare_attributes {
 	@attrsa = sort { $a cmp $b } (@{$first->{'attributes'}->{$name}});
 	@attrsb = sort { $a cmp $b } (@{$second->{'attributes'}->{$name}});
 
-	return $attrsa[0] || '' cmp $attrsb[0] || '';
+	return ($attrsa[0] || '') cmp ($attrsb[0] || '');
 
     }
 # descendant sort with symbolic comparsion
@@ -1518,16 +1588,15 @@ sub _compare_attributes {
 	@attrsa = sort { $b cmp $a } (@{$first->{'attributes'}->{$name}});
 	@attrsb = sort { $b cmp $a } (@{$second->{'attributes'}->{$name}});
 
-	return $attrsb[0] || '' cmp $attrsa[0] || '';
+	return ($attrsb[0] || '') cmp ($attrsa[0] || '');
 
     }
 # ascendant sort with numeric comparsion
     elsif ($order eq 'nasc') {
-
 	@attrsa = sort { $a <=> $b } (@{$first->{'attributes'}->{$name}});
 	@attrsb = sort { $a <=> $b } (@{$second->{'attributes'}->{$name}});
 
-	return 0 + ($attrsa[0] || 0) <=> 0 + ($attrsb[0] || 0);
+	return (0 + ($attrsa[0] || 0)) <=> (0 + ($attrsb[0] || 0));
 
     }
 # descendant sort with numeric comparsion
@@ -1536,7 +1605,7 @@ sub _compare_attributes {
 	@attrsa = sort { $b <=> $a } (@{$first->{'attributes'}->{$name}});
 	@attrsb = sort { $b <=> $a } (@{$second->{'attributes'}->{$name}});
 
-	return 0 + ($attrsb[0] || 0) <=> 0 + ($attrsa[0] || 0);
+	return (0 + ($attrsb[0] || 0)) <=> (0 + ($attrsa[0] || 0));
 
     }
     return 0;
