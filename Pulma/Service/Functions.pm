@@ -334,6 +334,8 @@ Function to check incoming value to be a valid number
 
 =item 1. (string) value to check
 
+=item 2. (boolean) possibility of negative value (optional, default: false)
+
 =back
 
 =head2 Returns
@@ -348,8 +350,14 @@ Function to check incoming value to be a valid number
 
 sub check_number {
     my $string = shift;
+    my $negative = shift || 0;
     return 0 unless defined $string;
-    return ($string =~ /^[0-9]+$/) ? 1 : 0;
+    if ($negative) {
+	return ($string =~ /^-?[0-9]+$/) ? 1 : 0;
+    }
+    else {
+	return ($string =~ /^[0-9]+$/) ? 1 : 0;
+    }
 }
 
 =head1 Function: check_sum
@@ -363,6 +371,8 @@ Function to check incoming value to be a valid money amount
 =over
 
 =item 1. (string) value to check
+
+=item 2. (boolean) possibility of negative value (optional, default: false)
 
 =back
 
@@ -378,10 +388,16 @@ Function to check incoming value to be a valid money amount
 
 sub check_sum {
     my $string = shift;
+    my $negative = shift || 0;
     return 0 unless defined $string;
     return 0 if (($string eq '') || ($string eq '.'));
     $string = '0' . $string;
-    return ($string =~ /^[0-9]+(\.[0-9]{0,2})?$/) ? 1 : 0;
+    if ($negative) {
+	return ($string =~ /^-?[0-9]+(\.[0-9]{0,2})?$/) ? 1 : 0;
+    }
+    else {
+	return ($string =~ /^[0-9]+(\.[0-9]{0,2})?$/) ? 1 : 0;
+    }
 }
 
 =head1 Function: check_uri
