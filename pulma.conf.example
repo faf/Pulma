@@ -13,7 +13,8 @@
 	    'driver' => 'SQLite',
 	    'dsn' => '/opt/pulma/usr/db/data.db',
 	    'user' => '',
-	    'passwd' => ''
+	    'passwd' => '',
+	    'autocommit' => 1
 	},
 	'cache' => 'none'
     },
@@ -25,7 +26,8 @@
 	    'driver' => 'SQLite',
 	    'dsn' => '/opt/pulma/usr/db/auth.db',
 	    'user' => '',
-	    'passwd' => ''
+	    'passwd' => '',
+	    'autocommit' => 1
 	},
 	'cache' => 'none'
     },
@@ -38,7 +40,8 @@
 	    'driver' => 'SQLite',
 	    'dsn' => '/opt/pulma/usr/db/logger.db',
 	    'user' => '',
-	    'passwd' => ''
+	    'passwd' => '',
+	    'autocommit' => 1
 	},
 	'cache' => 'memory'
     },

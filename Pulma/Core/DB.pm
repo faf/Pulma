@@ -68,7 +68,9 @@ Class constructor
 
     'user' => <username to use for database connection>
 
-    'passwd' => <password to use for database connection>
+    'passwd' => <password to use for database connection>,
+
+    'autocommit' => <1|0> - flag to use autocommit, default: 0
 
 }
 
@@ -85,6 +87,8 @@ sub new {
 	'config' => $config,
 	'name' => __PACKAGE__
     };
+
+    $self->{'config'}->{'autocommit'} ||= 0;
 
     $self = bless($self, $package);
 
@@ -320,11 +324,15 @@ sub _request {
 			    "::_request: obtaining data after request '%s' to DB failed. Error: %s",
 			$request, $result->{'error'} );
 
-		log_it( 'debug',
-			$self->{'name'} .
-			    "::_request: rolling back all changes made to DB" );
+		 unless ($self->{'config'}->{'autocommit'}) {
 
-		$self->{'connection'}->rollback();
+		    log_it( 'debug',
+			    $self->{'name'} .
+				"::_request: rolling back all changes made to DB" );
+
+		    $self->{'connection'}->rollback();
+
+		}
 
 		unless ( $params->{'_retry'} || $self->{'connection'}->ping() ) {
 # it was first try and DB connection is dead (ping failed) - retry
@@ -339,7 +347,7 @@ sub _request {
 		}
 
 	    }
-	    else {
+	    elsif (!$self->{'config'}->{'autocommit'}) {
 
 # everything fine, data from selective result obtained - commit changes to DB
 		log_it( 'debug',
@@ -355,12 +363,16 @@ sub _request {
 # everything fine, non-selective request succeed - commit changes to DB
 	    $result->{'data'} = 1;
 
-	    log_it( 'debug',
-		    $self->{'name'} .
-			"::_request: commiting data after non-selective request '%s' to DB",
-		    $request );
+	    unless ($self->{'config'}->{'autocommit'}) {
 
-	    $self->{'connection'}->commit();
+		log_it( 'debug',
+			$self->{'name'} .
+			    "::_request: commiting data after non-selective request '%s' to DB",
+			$request );
+
+		$self->{'connection'}->commit();
+
+	    }
 
 	}
 
@@ -376,11 +388,16 @@ sub _request {
 		    "::_request: execution of request '%s' to DB failed. Error: %s",
 		$request, $result->{'error'} );
 
-	log_it( 'debug',
-		$self->{'name'} .
-		    "::_request: rolling back all changes made to DB" );
+	unless ($self->{'config'}->{'autocommit'}) {
 
-	$self->{'connection'}->rollback();
+	    log_it( 'debug',
+		    $self->{'name'} .
+			"::_request: rolling back all changes made to DB" );
+
+	    $self->{'connection'}->rollback();
+
+	}
+
 	unless ( $params->{'_retry'} || $self->{'connection'}->ping() ) {
 # it was first try and DB connection is dead (ping failed) - retry
 
@@ -492,7 +509,7 @@ sub _connect {
 
 	my $options = { RaiseError => 0,
 			PrintError => 0,
-			AutoCommit => 0,
+			AutoCommit => $self->{'config'}->{'autocommit'} || 0,
 			ChopBlanks => 1
 	};
 
@@ -557,17 +574,20 @@ sub _disconnect {
 
     if (defined $self->{'connection'}) {
 
+	unless ($self->{'config'}->{'autocommit'}) {
 # rollback all uncommited changes
-	log_it( 'debug',
-		$self->{'name'} .
-		    "::_disconnect: rolling back all changes made to DB" );
+	    log_it( 'debug',
+		    $self->{'name'} .
+			"::_disconnect: rolling back all changes made to DB" );
 
-	my $res = $self->{'connection'}->rollback();
+	    my $res = $self->{'connection'}->rollback();
 
-	log_it( 'err',
-		$self->{'name'} .
-		    "::_disconnect: error while rolling back changes: %s",
-		$self->errstr() ) unless $res;
+	    log_it( 'err',
+		    $self->{'name'} .
+			"::_disconnect: error while rolling back changes: %s",
+		    $self->{'connection'}->errstr() ) unless $res;
+
+	}
 
     }
 
@@ -584,7 +604,7 @@ sub _disconnect {
 	    log_it( 'err',
 		    $self->{'name'} .
 			"::_disconnect: error while finishing request: %s",
-		    $self->errstr() ) unless $res; # hope, this works as i thought
+		    $self->{'requests'}->{$req}->errstr() ) unless $res; # hope, this works as i thought
 
 	}
 
