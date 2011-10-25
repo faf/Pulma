@@ -106,11 +106,9 @@ sub steps {
     $request = $$request;
 
 # get map
-    my $map = $self->{'parser'}->decode(join('', @{$self->{'file'}->get()->{'content'}}));
+    my $map = $self->_get_map();
 
-    unless (defined($map)) {
-	return [];
-    }
+    return [] unless defined $map;
 
     my $variants = {
 	'default' => undef,
@@ -191,6 +189,58 @@ sub steps {
     @$result = (@{$steps->{'before'}}, @$result, @{$steps->{'after'}});
 
     return $result;
+}
+
+=head1 Method: init_steps
+
+=head2 Description
+
+Method to determine chain of steps (data handlers) for the server start-up
+
+=head2 Argument(s)
+
+=over
+
+=item none
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (link to array) chain of steps
+
+=back
+
+=cut
+
+sub init_steps {
+    my $self = shift;
+
+# get map
+    my $map = $self->_get_map();
+
+    return (defined $map && exists($map->{'/init'})) ? $map->{'/init'} : [];
+}
+
+############################## Private methods ##################################
+
+# Method: _get_map
+# Description
+#	Method to get requests handling map
+# Argument(s)
+#	none
+# Returns
+#	(link to hash) requests handling map I<or> undef if correct map was not
+#		       found
+
+sub _get_map {
+    my $self = shift;
+
+    my $map = $self->{'parser'}->decode(join('',@{$self->{'file'}->get()->{'content'}}));
+
+    return defined($map) ? $map : undef;
 }
 
 1;

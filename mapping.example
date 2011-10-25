@@ -1,4 +1,18 @@
 {
+    "/init" : [
+
+	{
+	    "type" : "module",
+	    "details" : {
+		"module" : "Dummy::Init"
+	    },
+	    "logger" : true,
+	    "auth" : true,
+	    "data" : false
+	}
+
+    ],
+
     "/before" : [
 
 	{

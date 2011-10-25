@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.0.9";
+$VERSION = "0.0.10";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -53,6 +53,7 @@ BEGIN {
 
 use CGI::Cookie;
 use CGI::Fast qw(remote_addr header cookie redirect cgi_error escapeHTML);
+use Clone qw( clone );
 use Encode qw(_utf8_off);
 use FCGI::ProcManager qw(pm_manage pm_pre_dispatch pm_post_dispatch);
 use POSIX;
@@ -378,8 +379,36 @@ foreach ('auth', 'data', 'logger') {
     $config->{$_}->{'nodeid'} = $config->{'fcgi'}->{'nodeid'};
 }
 
+# initial resulting hash structure
+my $initial_result_hash = {
+
+	'status' => ERROR,
+	'mime_type' => 'text/html; charset=UTF-8',
+	'cookies' => [],
+	'template' => '500.html',
+	'document' => '',
+	'use_output' => 1,
+	'binary_data' => 0,
+	'headers' => {}
+
+};
+
+# take initial steps before actually start to handle requests
+log_it('debug', "Take initial steps");
+my $init_steps = $mapper->init_steps();
+if (scalar(@$init_steps)) {
+
+    _take_steps( $init_steps, { 'request' => { },
+				'pulma' => { 'data' => { } },
+				'result' => clone($initial_result_hash),
+				'stop' => 0 } );
+
+}
+
 # initialize requests counter
 my $cnt = 0;
+
+log_it('info', "CBC FastCGI requests handler with PID %s initialized.", $$);
 
 # main loop
 my $request;
@@ -403,18 +432,92 @@ while($request = CGI::Fast->new()) {
 	'pulma' => {
 	    'data' => {}
 	},
-	'result' => {
-	    'status' => ERROR,
-	    'mime_type' => 'text/html; charset=UTF-8',
-	    'cookies' => [],
-	    'template' => '500.html',
-	    'document' => '',
-	    'use_output' => 1,
-	    'binary_data' => 0,
-	    'headers' => {}
-	},
+	'result' => clone($initial_result_hash),
 	'stop' => 0
     };
+
+# take steps
+    $data = _take_steps($steps, $data);
+
+# output data
+    if ($data->{'result'}->{'use_output'}) {
+# use standard output object if not explicitly told otherwise
+	$data = $output->generate($data);
+    }
+
+# prepare main header if need to
+    $data->{'result'}->{'headers'}->{'-status'} ||= $data->{'result'}->{'status'};
+    $data->{'result'}->{'headers'}->{'-type'} ||= $data->{'result'}->{'mime_type'};
+
+# prepare cookies to store
+    foreach my $cookie (@{$data->{'result'}->{'cookies'}}) {
+
+	push(@{$data->{'result'}->{'headers'}->{'-cookie'}},
+	     cookie( -name => $cookie->{'name'} || 'pulma',
+		     -secure => $cookie->{'secure'} || 0,
+		     -httponly => $cookie->{'httponly'} || 0,
+		     -value => exists ($cookie->{'value'}) ?
+				$cookie->{'value'} :
+				'pulma',
+		     -path => $cookie->{'path'} || '/',
+		     -expires => ($cookie->{'delete'} ? '-' : '+') .
+				 ($cookie->{'expires'} || '120') . 's'));
+
+    }
+
+# send output to client
+    if ($data->{'result'}->{'headers'}->{'-status'} == REDIRECT) {
+	print redirect($data->{'result'}->{'headers'});
+    }
+    else {
+        print header($data->{'result'}->{'headers'});
+
+	my $document = $data->{'result'}->{'document'} || '';
+	if ($data->{'result'}->{'binary_data'}) {
+	    binmode(STDOUT);
+	}
+	else {
+	    binmode(STDOUT, ":utf8");
+	    _utf8_off($document);
+	}
+	print $document;
+    }
+
+
+# write brief info about request into system log
+    my $time = localtime(time);
+    log_it( 'info',
+	    "%s: \"%s\" \"%s\" \"%s %s %s\" %s %s \"%s\"",
+	    $requestid,
+	    remote_addr(),
+	    $time,
+	    $ENV{'REQUEST_METHOD'},
+	    $ENV{'REQUEST_URI'},
+	    $ENV{'SERVER_PROTOCOL'},
+	    $data->{'result'}->{'status'},
+	    length($data->{'result'}->{'document'}),
+	    $ENV{'HTTP_USER_AGENT'} );
+
+# post-request operations
+    pm_post_dispatch();
+
+}
+
+############################## Private functions ##################################
+
+# Function: _take_steps
+# Description
+#	Function to handle request
+# Argument(s)
+#	1. (link to array) steps to take (detailed list of data handlers)
+#	2. (link to hash) data structure
+# Returns
+#	(link to hash) data structure after request handling
+#
+
+sub _take_steps {
+    my $steps = shift;
+    my $data = shift;
 
 # pass data structure through all handlers (step by step)
     foreach my $step (@$steps) {
@@ -524,67 +627,10 @@ while($request = CGI::Fast->new()) {
 	log_it('err', "No steps to take for incoming request!");
     }
 
-    if ($data->{'result'}->{'use_output'}) {
-# use standard output object if not explicitly told otherwise
-	$data = $output->generate($data);
-    }
-
-# prepare main header if need to
-    $data->{'result'}->{'headers'}->{'-status'} ||= $data->{'result'}->{'status'};
-    $data->{'result'}->{'headers'}->{'-type'} ||= $data->{'result'}->{'mime_type'};
-
-# prepare cookies to store
-    foreach my $cookie (@{$data->{'result'}->{'cookies'}}) {
-
-	push(@{$data->{'result'}->{'headers'}->{'-cookie'}},
-	     cookie( -name => $cookie->{'name'} || 'pulma',
-		     -secure => $cookie->{'secure'} || 0,
-		     -httponly => $cookie->{'httponly'} || 0,
-		     -value => exists ($cookie->{'value'}) ?
-				$cookie->{'value'} :
-				'pulma',
-		     -path => $cookie->{'path'} || '/',
-		     -expires => ($cookie->{'delete'} ? '-' : '+') .
-				 ($cookie->{'expires'} || '120') . 's'));
-
-    }
-
-# send output to client
-    if ($data->{'result'}->{'headers'}->{'-status'} == REDIRECT) {
-	print redirect($data->{'result'}->{'headers'});
-    }
-    else {
-        print header($data->{'result'}->{'headers'});
-
-	my $document = $data->{'result'}->{'document'} || '';
-	if ($data->{'result'}->{'binary_data'}) {
-	    binmode(STDOUT);
-	}
-	else {
-	    binmode(STDOUT, ":utf8");
-	    _utf8_off($document);
-	}
-	print $document;
-    }
-
-# write brief info about request into system log
-    my $time = localtime(time);
-    log_it( 'info',
-	    "%s: \"%s\" \"%s\" \"%s %s %s\" %s %s \"%s\"",
-	    $requestid,
-	    remote_addr(),
-	    $time,
-	    $ENV{'REQUEST_METHOD'},
-	    $ENV{'REQUEST_URI'},
-	    $ENV{'SERVER_PROTOCOL'},
-	    $data->{'result'}->{'status'},
-	    length($data->{'result'}->{'document'}),
-	    $ENV{'HTTP_USER_AGENT'} );
-
-# post-request operations
-    pm_post_dispatch();
-
+    return $data;
 }
+
+################################## END Block ######################################
 
 END {
 
