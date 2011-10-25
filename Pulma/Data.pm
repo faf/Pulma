@@ -1539,7 +1539,8 @@ sub _check_filter_operation {
 	     ($operation eq '<') ||
 	     ($operation eq '>') ||
 	     ($operation eq '<=') ||
-	     ($operation eq '>=') );
+	     ($operation eq '>=') ||
+	     ($operation eq '<>') );
 }
 
 # Function: _compare_attributes
