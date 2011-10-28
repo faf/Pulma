@@ -352,7 +352,7 @@ All conditions are optional. Each condition is a hash:
 
 B<or>
 
-{ 'name' => <name>, 'sort' => (asc|desc) }
+{ 'name' => <name>, 'sort' => (asc|desc|nasc|ndesc) }
 
 where <name> is a name of entity's attribute, <value> is the value of that
 attribute, and <operation> is one of '=', '<=', '>=', '<', '>'
@@ -1226,10 +1226,19 @@ sub _get_entities_from_localdb {
 
 			$request .= '( name = ? )';
 			push (@args, $condition->{'name'});
-			$sort = ' order by val ' .
-				( ($condition->{'sort'} eq 'desc') ?
-				  'desc' :
-				  'asc' );
+			$sort = ' order by val ';
+			if ($condition->{'sort'} eq 'desc') {
+			    $sort .= 'desc';
+			}
+			elsif ($condition->{'sort'} eq 'ndesc') {
+			    $sort .= '+ 0 desc';
+			}
+			elsif ($condition->{'sort'} eq 'nasc') {
+			    $sort .= '+ 0 asc';
+			}
+			else {
+			    $sort .= 'asc';
+			}
 
 		    }
 
@@ -1267,7 +1276,7 @@ sub _get_entities_from_localdb {
 	    my $new_results = {};
 	    foreach (@{$res->{'data'}}) {
 
-		$new_results->{$_->{'entity'}} = ($sort ne '') ? $count++ : $count;
+		$new_results->{$_->{'entity'}} = ($sort ne '') ? ++$count : $count;
 
 	    }
 
@@ -1285,13 +1294,15 @@ sub _get_entities_from_localdb {
 				    $new_results->{$a} <=> $new_results->{$b} :
 				    $results->{$a} <=> $results->{$b} } keys(%$new_results);
 
-		$count = 0;
 		foreach (@keys) {
-		    $new_results->{$_} = $count++;
+		    $new_results->{$_} = ($results->{$_} == 1) ?
+					 $new_results->{$_} :
+					 $results->{$_};
 		}
 	    }
 
 	    $results = $new_results;
+
 	    $first &&= 0;
 
 # no entities after intersecion => no entities should be returned at all
