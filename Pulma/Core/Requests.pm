@@ -162,7 +162,7 @@ sub request {
 		    'params' => $params,
 		    'cookies' => $cookies,
 		    'method' => request_method(),
-		    'remoteip' => remote_addr(),
+		    'remoteip' => http('X-Real-IP') || http('X-Forwarded-For') || remote_addr(),
 		    'useragent' => user_agent(),
 		    'urlbase' => url(-base => 1),
 		    'url' => url(-absolute => 1, -path => 1),
