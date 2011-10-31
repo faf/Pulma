@@ -31,8 +31,8 @@ our @ISA = ('Exporter');
 our @EXPORT = qw( &calculate_password_hash &calculate_password_strength
 		  &check_color &check_date &check_email &check_login
 		  &check_number &check_sum &check_uri &escape &generate_entity_id
-		  &generate_rnd_string &make_http_date &pager &truncate_string
-		  &uri_escape &uri_escape_utf8 &uri_unescape );
+		  &generate_rnd_string &make_http_date &pager &regexp_check
+		  &truncate_string &uri_escape &uri_escape_utf8 &uri_unescape );
 
 use CGI::Fast qw(:standard);
 use Digest::MD5 qw(md5_hex);
@@ -681,6 +681,46 @@ sub pager {
     }
 
     return $pager;
+}
+
+=head1 Function: regexp_check
+
+=head2 Description
+
+Function to compare incoming value with the regular expression provided
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to compare
+
+=item 2. (string) regular expression to compare with (NOTE: regular expression
+should be in form of /<template>/)
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (array) ( (integer) <-1 if regular expression was invalid, 1 if value
+matches regular expression, I<or> 0 - otherwise>, (string) <value of $1 variable
+if exists, I<or> undef> )
+
+=back
+
+=cut
+
+sub regexp_check {
+    my $value = shift;
+    my $regexp = shift;
+
+    return -1 unless ($regexp =~ /^\/(.+)\/$/) && eval { '' =~ /$1/; 1 };
+    my $template = $1;
+    return ($value =~ /$template/) ?
+	    (1, (defined $1) ? $1 : undef) :
+	    (0, undef);
 }
 
 =head1 Function: truncate_string
