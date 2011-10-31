@@ -27,6 +27,7 @@ use warnings;
 
 use Pulma::Cacher::File;
 use Pulma::Service::Data::Parser;
+use Pulma::Service::Functions;
 use Pulma::Service::Log;
 
 =head1 Method: new
@@ -137,11 +138,10 @@ sub steps {
 # exact match not found, test requested path againts regular expressions in
 # mapping
 	foreach my $key (sort(keys(%$map))) {
-	    next unless ($key =~ /^\/(.+)\/$/) && eval { '' =~ /$1/; 1 };
-	    my $template = $1;
-	    if ($request->{'path'} =~ /$template/) {
+	    my @check = regexp_check($request->{'path'}, $key);
+	    if ($check[0] > 0) {
 		$variants->{'real'} = $map->{$key};
-		$request->{'subpath'} = $1 if (defined $1);
+		$request->{'subpath'} = $check[1] if (defined $check[1]);
 		last;
 	    }
 	}
@@ -154,27 +154,99 @@ sub steps {
 	'after' => []
     };
 
-# TODO: add restriction by path
-
 # take into account all restrictions for all chains of steps (default, found,
 # starting and finishing)
     foreach ('default', 'real', 'before', 'after') {
 	next unless defined $variants->{$_};
 	foreach my $step (@{$variants->{$_}}) {
 	    if (exists($step->{'restrictions'})) {
+		my $match = 1;
+# restrictions by method
 		if (exists($step->{'restrictions'}->{'method'})) {
+		    $match = 0;
 		    if (ref($step->{'restrictions'}->{'method'}) eq 'ARRAY') {
 			foreach my $restriction (@{$step->{'restrictions'}->{'method'}}) {
 			    if ($restriction eq $request->{'method'}) {
-				push(@{$steps->{$_}}, $step);
+				$match = 1;
 				last;
 			    }
 			}
 		    }
 		    elsif (ref($step->{'restrictions'}->{'method'}) eq '') {
-			push(@{$steps->{$_}}, $step) if ($step->{'restrictions'}->{'method'} eq $request->{'method'});
+			$match = 1 if ($step->{'restrictions'}->{'method'} eq $request->{'method'});
+		    }
+
+# method not matched - skip step
+		    next unless $match;
+		}
+
+# restrictions by IP
+		if (exists($step->{'restrictions'}->{'ip'})) {
+		    $match = 0;
+		    if (ref($step->{'restrictions'}->{'ip'}) eq 'ARRAY') {
+			foreach my $restriction (@{$step->{'restrictions'}->{'ip'}}) {
+			    if ($restriction eq $request->{'remoteip'}) {
+				$match = 1;
+				last;
+			    }
+			}
+		    }
+		    elsif (ref($step->{'restrictions'}->{'ip'}) eq '') {
+			$match = 1 if ($step->{'restrictions'}->{'ip'} eq $request->{'remoteip'});
+		    }
+
+# ip not matched - skip step
+		    next unless $match;
+		}
+# restrictions by path
+		if (exists($step->{'restrictions'}->{'path'})) {
+		    $match = 0;
+		    if (ref($step->{'restrictions'}->{'path'}) eq '') {
+			$step->{'restrictions'}->{'path'} = [ $step->{'restrictions'}->{'path'} ];
+		    }
+		    if (ref($step->{'restrictions'}->{'path'}) eq 'ARRAY') {
+			foreach my $restriction (@{$step->{'restrictions'}->{'path'}}) {
+			    if ($restriction eq $request->{'path'}) {
+				$match = 1;
+				last;
+			    }
+			    else {
+				my @check = regexp_check($request->{'path'}, $restriction);
+				if ($check[0] > 0) {
+				    $match = 1;
+				    last;
+				}
+			    }
+			}
 		    }
 		}
+# restrictions by useragent
+		if (exists($step->{'restrictions'}->{'ua'})) {
+		    $match = 0;
+		    if (ref($step->{'restrictions'}->{'ua'}) eq '') {
+			$step->{'restrictions'}->{'ua'} = [ $step->{'restrictions'}->{'ua'} ];
+		    }
+		    if (ref($step->{'restrictions'}->{'ua'}) eq 'ARRAY') {
+			foreach my $restriction (@{$step->{'restrictions'}->{'ua'}}) {
+			    if ($restriction eq $request->{'useragent'}) {
+				$match = 1;
+				last;
+			    }
+			    else {
+				my @check = regexp_check($request->{'useragent'}, $restriction);
+				if ($check[0] > 0) {
+				    $match = 1;
+				    last;
+				}
+			    }
+			}
+		    }
+# useragent not matched - skip step
+		    next unless $match;
+		}
+
+		push(@{$steps->{$_}}, $step) if ($match);
+
 	    }
 	    else {
 		push(@{$steps->{$_}}, $step);
