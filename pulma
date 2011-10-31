@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.0.12";
+$VERSION = "0.0.13";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -489,14 +489,14 @@ while($request = CGI::Fast->new()) {
     log_it( 'info',
 	    "%s: \"%s\" \"%s\" \"%s %s %s\" %s %s \"%s\"",
 	    $requestid,
-	    remote_addr(),
+	    $incoming->{'remoteip'},
 	    $time,
-	    $ENV{'REQUEST_METHOD'},
-	    $ENV{'REQUEST_URI'},
+	    $incoming->{'method'},
+	    $incoming->{'fullurl'},
 	    $ENV{'SERVER_PROTOCOL'},
 	    $data->{'result'}->{'status'},
 	    length($data->{'result'}->{'document'}) || 0,
-	    $ENV{'HTTP_USER_AGENT'} );
+	    $incoming->{'useragent'} );
 
 # post-request operations
     pm_post_dispatch();
