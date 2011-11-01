@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.0.13";
+$VERSION = "0.0.14";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -608,12 +608,20 @@ sub _take_steps {
 		    }
 	    }
 
+# check step details, should be hash
+	    unless ( defined($step->{'details'}->{'data'}) &&
+		     (ref($step->{'details'}->{'data'}) eq 'HASH') ) {
+
+		$step->{'details'}->{'data'} = {};
+
+	    }
+
 # handle data
 	    $data = $objects->{$step->{'details'}->{'module'} .
 			       ($step->{'auth'} ? 1 : 0) .
 			       ($step->{'data'} ? 1 : 0) .
 			       ($step->{'logger'} ? 1 : 0)}->action( $data,
-			    					     $step->{'details'}->{'data'} || {} );
+			    					     $step->{'details'}->{'data'} );
 
 # stop if module at this step explicitly say that
 	    last if $data->{'stop'};
