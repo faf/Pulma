@@ -32,9 +32,10 @@ our @EXPORT = qw( &calculate_password_hash &calculate_password_strength
 		  &check_color &check_date &check_email &check_login
 		  &check_number &check_sum &check_uri &escape &generate_entity_id
 		  &generate_rnd_string &make_http_date &pager &regexp_check
-		  &truncate_string &uri_escape &uri_escape_utf8 &uri_unescape );
+		  &truncate_string &unescape &uri_escape &uri_escape_utf8
+		  &uri_unescape &uri_unescape_utf8);
 
-use CGI::Fast qw(:standard);
+use CGI::Fast qw(:standard unescapeHTML);
 use Digest::MD5 qw(md5_hex);
 use Digest::SHA1 qw(sha1_hex);
 use Email::Valid;
@@ -765,6 +766,34 @@ sub truncate_string {
     return $string;
 }
 
+=head1 Function: unescape
+
+=head2 Description
+
+see function B<unescapeHTML> in CGI module
+
+=head2 Argument(s)
+
+=over
+
+=item see function B<unescapeHTML> in CGI module
+
+=back
+
+=head2 Returns
+
+=over
+
+=item see function B<unescapeHTML> in CGI module
+
+=back
+
+=cut
+
+sub unescape {
+    return unescapeHTML(@_) || '';
+}
+
 =head1 Function: uri_escape
 
 =head2 Description
@@ -836,5 +865,41 @@ see URI::Escape module for details
 =back
 
 =cut
+
+
+=head1 Function: uri_unescape_utf8
+
+=head2 Description
+
+Same function as uri_unescape, but with additional Unicode-related tweak
+
+=head2 Argument(s)
+
+=over
+
+=item see URI::Escape module for details
+
+=back
+
+=head2 Returns
+
+=over
+
+=item see URI::Escape module for details
+
+=back
+
+=cut
+
+sub uri_unescape_utf8 {
+    my @strings = shift;
+
+    foreach (@strings) {
+	$_ = uri_unescape($_);
+	_utf8_on($_);
+    }
+
+    return @strings;
+}
 
 1;
