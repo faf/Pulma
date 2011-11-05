@@ -140,10 +140,11 @@ sub action {
 
     $self->{'logger'}->create_entity({
 
-	'etype' => 'http_error',
+	'etype' => 'event',
 
 	'attributes' => {
 
+	    'subtype'	=> [ 'http_error' ],
 	    'time'	=> [ time ],
 	    'aentity'	=> [ exists($data->{'pulma'}->{'auth'}->{'user'}->{'id'}) ? $data->{'pulma'}->{'auth'}->{'user'}->{'id'} : 0 ],
 	    'dentity'	=> [ exists($data->{'pulma'}->{'dentity'}) ? $data->{'pulma'}->{'dentity'}->{'id'} || 0 : 0 ],
