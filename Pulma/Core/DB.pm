@@ -70,7 +70,16 @@ Class constructor
 
     'passwd' => <password to use for database connection>,
 
-    'autocommit' => <1|0> - flag to use autocommit, default: 0
+    'autocommit' => <1|0> - flag to use autocommit, default: 0,
+
+    'init' => [<list of commands to execute on connection>], default: []
+	      list values could be given as scalars, arrays or hashes.
+	      scalar will be classified as sql-query. in case of array, the
+	      first element will be classified as query, while all others as
+	      placeholders.
+	      hash should be of special form:
+		    {	'method' => <DBI method name>,
+			'args' => [<arguments to call method with] }
 
 }
 
@@ -89,6 +98,7 @@ sub new {
     };
 
     $self->{'config'}->{'autocommit'} ||= 0;
+    $self->{'config'}->{'init'} ||= [];
 
     $self = bless($self, $package);
 
@@ -553,6 +563,82 @@ sub _connect {
 		$@ );
 
 	$result = 0;
+
+    }
+
+    log_it( 'debug',
+	    $self->{'name'} .
+		"::_connect: executing initial commands" );
+
+# execute initial commands (if need to)
+    my $counter = 0;
+    foreach my $command (@{$self->{'config'}->{'init'}}) {
+
+	$counter++;
+
+	if ( (ref($command) eq '') || (ref($command) eq 'ARRAY') ) {
+
+	    my $res = undef;
+
+	    if (ref($command) eq 'ARRAY') {
+
+		my $cmd = shift(@$command);
+		$res = $self->{'connection'}->do($cmd, undef, @{$command});
+
+	    }
+	    else {
+
+		$res = $self->{'connection'}->do($command);
+
+	    }
+
+	    if (defined $res) {
+
+		log_it( 'debug',
+			$self->{'name'} .
+			    "::_connect: init command number %s successfully executed",
+			$counter );
+	    }
+	    else {
+
+		log_it( 'err',
+			$self->{'name'} .
+			    "::_connect: failed to execute initial command number %s",
+			$counter );
+	    }
+
+	}
+	elsif (ref($command) eq 'HASH') {
+	    if ( exists($command->{'method'}) &&
+		 (ref($command->{'method'}) eq '') &&
+		 exists($command->{'args'}) &&
+		 (ref($command->{'args'}) eq 'ARRAY') ) {
+
+		my $method = $command->{'method'};
+		my $res = $self->{'connection'}->$method($command->{'args'});
+
+		log_it( 'debug',
+			$self->{'name'} .
+			    "::_connect: init method number %s called, got result: %s",
+			$counter, Dumper($res) );
+
+	    }
+	    else {
+
+		log_it( 'err',
+			$self->{'name'} .
+			    "::_connect: failed to execute initial command number %s: invalid hash structure",
+			$counter );
+
+	    }
+	}
+	else {
+
+	    log_it( 'err',
+		    $self->{'name'} .
+			"::_connect: failed to execute initial command number %s: expected scalar, array, or hash, got %s",
+		    $counter, ref($command) );
+	}
 
     }
 

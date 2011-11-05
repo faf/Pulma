@@ -14,7 +14,13 @@
 	    'dsn' => '/opt/pulma/usr/db/data.db',
 	    'user' => '',
 	    'passwd' => '',
-	    'autocommit' => 1
+	    'autocommit' => 1,
+	    'init' => [
+		{ 'method' => 'sqlite_enable_load_extension',
+		  'args' => [ '1' ] },
+		[ 'select load_extension(?)',
+		  '/usr/lib64/sqlite3/pcre.so' ]
+	    ]
 	},
 	'cache' => 'none'
     },
@@ -27,7 +33,13 @@
 	    'dsn' => '/opt/pulma/usr/db/auth.db',
 	    'user' => '',
 	    'passwd' => '',
-	    'autocommit' => 1
+	    'autocommit' => 1,
+	    'init' => [
+		{ 'method' => 'sqlite_enable_load_extension',
+		  'args' => [ '1' ] },
+		[ 'select load_extension(?)',
+		  '/usr/lib64/sqlite3/pcre.so' ]
+	    ]
 	},
 	'cache' => 'none'
     },
@@ -41,7 +53,13 @@
 	    'dsn' => '/opt/pulma/usr/db/logger.db',
 	    'user' => '',
 	    'passwd' => '',
-	    'autocommit' => 1
+	    'autocommit' => 1,
+	    'init' => [
+		{ 'method' => 'sqlite_enable_load_extension',
+		  'args' => [ '1' ] },
+		[ 'select load_extension(?)',
+		  '/usr/lib64/sqlite3/pcre.so' ]
+	    ]
 	},
 	'cache' => 'memory'
     },
