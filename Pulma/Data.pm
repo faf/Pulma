@@ -355,7 +355,11 @@ B<or>
 { 'name' => <name>, 'sort' => (asc|desc|nasc|ndesc) }
 
 where <name> is a name of entity's attribute, <value> is the value of that
-attribute, and <operation> is one of '=', '<=', '>=', '<', '>'
+attribute, and <operation> is one of '=', '<=', '>=', '<', '>', '<>', '~'
+
+B<NOTE!> '~' stands for regular expression match. value should be in form
+of B</regular expression/> In case of invalid regular expression or wrong
+form of value '~', operation degrades to the simple '=' operation.
 
 B<IMPORTANT!> One should be aware that (at least for localdb backend) sorting
 will work for the values of I<all> attributes used in condition, not only for
@@ -1217,7 +1221,20 @@ sub _get_entities_from_localdb {
 
 		    if (exists($condition->{'value'})) {
 
-			$request .= '(name = ? and val ' . $condition->{'op'} .
+# check regular expression on '~' operation,
+# replace operation with '=' if regular expression is invalid
+			if ( ($condition->{'op'} eq '~') &&
+			     !( ($condition->{'value'} =~ /^\/(.+)\/$/) &&
+				eval { '' =~ /$1/; 1 } ) ) {
+
+			    $condition->{'op'} = '='
+
+			}
+
+			$request .= '(name = ? and val ' .
+				    ( ($condition->{'op'} ne '~') ?
+					$condition->{'op'} :
+					'regexp' ) .
 				    ' ?)';
 			push (@args, $condition->{'name'}, $condition->{'value'});
 
@@ -1551,7 +1568,8 @@ sub _check_filter_operation {
 	     ($operation eq '>') ||
 	     ($operation eq '<=') ||
 	     ($operation eq '>=') ||
-	     ($operation eq '<>') );
+	     ($operation eq '<>') ||
+	     ($operation eq '~' ) );
 }
 
 # Function: _compare_attributes
