@@ -1221,14 +1221,24 @@ sub _get_entities_from_localdb {
 
 		    if (exists($condition->{'value'})) {
 
+			my $value = $condition->{'value'};
+
 # check regular expression on '~' operation,
-# replace operation with '=' if regular expression is invalid
-			if ( ($condition->{'op'} eq '~') &&
-			     !( ($condition->{'value'} =~ /^\/(.+)\/$/) &&
-				eval { '' =~ /$1/; 1 } ) ) {
+# replace operation with '=' if regular expression is invalid, fix regular
+# expression otherwise
+			if ($condition->{'op'} eq '~') {
 
-			    $condition->{'op'} = '='
+			    unless ( ($condition->{'value'} =~ /^\/(.+)\/$/) &&
+				eval { '' =~ /$1/; 1 } ) {
 
+				$condition->{'op'} = '='
+
+			    }
+			    else {
+
+				$value = $1;
+
+			    }
 			}
 
 			$request .= '(name = ? and val ' .
@@ -1236,7 +1246,7 @@ sub _get_entities_from_localdb {
 					$condition->{'op'} :
 					'regexp' ) .
 				    ' ?)';
-			push (@args, $condition->{'name'}, $condition->{'value'});
+			push (@args, $condition->{'name'}, $value);
 
 		    }
 		    else {
