@@ -153,6 +153,8 @@ sub request {
     my $cookies = CGI::Cookie->fetch();
     foreach my $cookie (keys(%$cookies)) {
 	$cookies->{$cookie} = [$cookies->{$cookie}->value()];
+# utf-decode
+	$cookies->{$cookie}->[0] = decode_utf8($cookies->{$cookie}->[0]);
     }
 
 # prepare request data structure
