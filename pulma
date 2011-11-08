@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.0.17";
+$VERSION = "0.0.18";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -81,6 +81,84 @@ $Pulma::Service::Log::Level = $config->{'syslog'}->{'log_level'};
 $Pulma::Service::Log::Ident = $config->{'syslog'}->{'syslog_ident'};
 $Pulma::Service::Log::Logopt = $config->{'syslog'}->{'syslog_logopt'};
 $Pulma::Service::Log::Facility = $config->{'syslog'}->{'syslog_facility'};
+
+# configure external logging (if need to)
+if ( exists($config->{'external_log'}) ) {
+
+    if (ref($config->{'external_log'}) eq 'CODE') {
+
+# external logging as code (anonymous function)
+	*ext_log = $config->{'external_log'};
+
+# test given code
+	eval "ext_log('debug', 'Check external logging');";
+	if ($@) {
+
+	    log_it( 'err',
+		    "Failed to use given anonymous function for external logging: %s",
+		    $@ );
+
+	}
+	else {
+
+# test passed, set function for external logging
+	    $Pulma::Service::Log::ExtLog = \&ext_log;
+
+	}
+
+    }
+    elsif (ref($config->{'external_log'}) eq '') {
+
+# external logging as function in external module
+	my ($module, $func, @args) = split('/', $config->{'external_log'});
+
+# test external module
+	eval "require $module";
+	if ($@) {
+
+	    log_it( 'err',
+		    "Failed to require module %s for external logging: %s",
+		    $module, $@ );
+
+	}
+	else {
+
+# test function in external module (see Pulma::Service::Log for details)
+	    my $test_args = '';
+	    if (scalar(@args) > 0) {
+		$test_args = "''," . "''," x (scalar(@args) - 1);
+	    }
+
+	    *ext_log = $module . '::' . $func;
+
+	    eval "ext_log(" . $test_args . "'debug', 'Check external logging');";
+	    if ($@) {
+
+		log_it( 'err',
+			"Failed to use given function '%s' in external module '%s' for external logging: %s",
+			$module, $func, $@ );
+
+	    }
+	    else {
+
+# test passed, set function for external logging
+		$Pulma::Service::Log::ExtLog = \&ext_log;
+		@Pulma::Service::Log::ExtLogArgs = @args;
+
+	    }
+
+	}
+
+    }
+    else {
+
+	log_it( 'err',
+		"Invalid external logging settings. Expected anonymous function or function name, got: %s",
+		ref($config->{'external_log'}) );
+
+    }
+
+}
 
 # chroot if need to
 if (defined $config->{'fcgi'}->{'chroot'}) {
@@ -486,7 +564,7 @@ while($request = CGI::Fast->new()) {
 
 # write brief info about request into system log
     my $time = localtime(time);
-    log_it( 'info',
+    log_it( 'notice',
 	    "%s: \"%s\" \"%s\" \"%s %s %s\" %s %s \"%s\"",
 	    $requestid,
 	    $incoming->{'remoteip'},

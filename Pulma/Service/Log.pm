@@ -65,11 +65,59 @@ $Logopt = '' unless defined $Logopt;
 our $Facility;
 $Facility = '' unless defined $Facility;
 
+=head1 Function: Pulma::Service::Log::ExtLog
+
+=head2 Description
+
+External log function that could be overriden
+
+=head2 Argument(s)
+
+=over
+
+=item ?. (various) elements of the B<Pulma::Service::Log::ExtLogArgs> array
+
+=item 1. (string) priority
+
+=item 2. (string) message (in sprintf format, with placeholders)
+
+=item 3. (array) values to populate message with (using sprintf)
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 in all cases
+
+=back
+
+B<NOTE!> This function called right after log into syslog. There are
+usually a lot of messages of level 'debug', so you have to correctly handle
+priorities in your own logging function.
+
+B<IMPORTANT!> If function for external logging written with use of
+B<Pulma::Service::Log::ExtLogsArgs> array it should correctly handle a situation
+when all elements of that array is defined but empty. It should be done for
+validation of that function during Pulma startup.
+
+=cut
+
+our @ExtLogArgs = ();
+
+our $ExtLog;
+$ExtLog = sub { return 1; } unless (defined $ExtLog && (ref($ExtLog) ne 'CODE'));
+
+
+
 =head1 Function: log_it
 
 =head2 Description
 
 Write message to syslog
+
+Call external logging function
 
 =head2 Argument(s)
 
@@ -98,29 +146,38 @@ sub log_it {
     my $message = shift;
     my @data = @_;
 
-    openlog($Ident, $Logopt, $Facility);
+# check whether syslog switched on
+    unless ($Level < 0) {
 
-    my $level;
+	openlog($Ident, $Logopt, $Facility);
+
+	my $level;
+
 # set up actual log level
-    if ($Level == 0) {
-	$level = LOG_WARNING;
-    }
-    elsif ($Level == 1) {
-	$level = LOG_NOTICE;
-    }
-    elsif ($Level == 2) {
-	$level = LOG_INFO;
-    }
-    else {
-	$level = LOG_DEBUG;
-    }
+	if ($Level == 0) {
+	    $level = LOG_WARNING;
+	}
+	elsif ($Level == 1) {
+	    $level = LOG_NOTICE;
+	}
+	elsif ($Level == 2) {
+	    $level = LOG_INFO;
+	}
+	else {
+	    $level = LOG_DEBUG;
+	}
 
-    setlogmask(LOG_UPTO($level));
+	setlogmask(LOG_UPTO($level));
 
 # write message to syslog
-    syslog($priority, sprintf($message, @data));
+	syslog($priority, sprintf($message, @data));
 
-    closelog();
+	closelog();
+
+    }
+
+# call external logging function
+    &$ExtLog(@ExtLogArgs, $priority, $message, @data);
 
     return 1;
 }

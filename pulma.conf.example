@@ -69,11 +69,19 @@
 # System log configuration ######################################################
     'syslog' => {
 # syslog options
-	'log_level' => 3,
+	'log_level' => 3, # use -1 (or any other negative number) to prevent
+			  # write to syslog
 	'syslog_facility' => 'daemon',
 	'syslog_ident' => 'pulma',
 	'syslog_logopt' => 'pid|cons|nofatal'
     },
+
+# external logging. one can specify an anonymous function or name of an
+# external function in form of 'ModuleName/function/argument1/argument2/...'
+# for external function with arguments see documentation on Pulma::Service::Log
+# module for important details
+#     'external_log' => sub {},
+#     'external_log' => 'Module/function',
 
 # Templates engine configuration ################################################
 
