@@ -27,6 +27,7 @@ use warnings;
 
 use Pulma::Auth;
 use Pulma::Data;
+use Pulma::Dummy;
 use Pulma::Logger;
 
 use Pulma::Service::Data::Parser;
@@ -108,6 +109,16 @@ sub new {
 	}
 
     }
+    else {
+
+# initialize dummy logger object
+
+	log_it( 'debug',
+		$self->{'name'} . '::new: initializing dummy logger object' );
+
+	$self->{'logger'} = Pulma::Dummy->new({}, \$cache);
+
+    }
 
     if (exists($config->{'data'})) {
 
@@ -126,6 +137,16 @@ sub new {
 	}
 
     }
+    else {
+
+# initialize dummy data object
+
+	log_it( 'debug',
+		$self->{'name'} . '::new: initializing dummy data object' );
+
+	$self->{'data'} = Pulma::Dummy->new({}, \$cache);
+
+    }
 
     if (exists($config->{'auth'})) {
 
@@ -142,6 +163,16 @@ sub new {
 	    return undef;
 
 	}
+
+    }
+    else {
+
+# initialize dummy auth object
+
+	log_it( 'debug',
+		$self->{'name'} . '::new: initializing dummy auth object' );
+
+	$self->{'auth'} = Pulma::Dummy->new({}, \$cache);
 
     }
 
