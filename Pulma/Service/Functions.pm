@@ -458,7 +458,8 @@ see function B<escapeHTML> in CGI module
 =cut
 
 sub escape {
-    return escapeHTML(@_) || '';
+    my $escaped = escapeHTML(@_);
+    return (defined $escaped) ? $escaped : '';
 }
 
 =head1 Function: generate_entity_id
@@ -791,7 +792,8 @@ see function B<unescapeHTML> in CGI module
 =cut
 
 sub unescape {
-    return unescapeHTML(@_) || '';
+    my $unescaped = unescapeHTML(@_);
+    return (defined $unescaped) ? $unescaped : '';
 }
 
 =head1 Function: uri_escape
