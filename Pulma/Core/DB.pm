@@ -583,7 +583,16 @@ sub _connect {
 	    if (ref($command) eq 'ARRAY') {
 
 		my $cmd = shift(@$command);
-		$res = $self->{'connection'}->do($cmd, undef, @{$command});
+		if (scalar(@$command)) {
+
+		    $res = $self->{'connection'}->do($cmd, undef, @{$command});
+
+		}
+		else {
+
+		    $res = $self->{'connection'}->do($cmd);
+
+		}
 
 	    }
 	    else {
