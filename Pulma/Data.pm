@@ -642,7 +642,7 @@ sub create_entity {
 	}
 
 # try to create entity
-	my $res = $self->{'db'}->execute( {'select' => 1, 'cache' => 1},
+	my $res = $self->{'db'}->execute( {'select' => 0, 'cache' => 1},
 					  'insert into entities (id, etype, modtime) values (?, ?, ?)',
 					  $entity->{'id'}, $entity->{'etype'}, $entity->{'modtime'} );
 
