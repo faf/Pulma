@@ -153,7 +153,12 @@ Execute SQL-request to DB and retrieve result
     'cache' => 0 or 1 - flag to save prepared request in cache,
 
     'select' => 0 or 1 - whether request is selective or not (i.e. whether it
-		should return some data or not)
+		should return some data or not),
+
+    'commit' => 0 or 1 - optional flag to prevent request results from being
+		commited to DB (naturally, this flag only takes effect if
+		autocommit is disabled, see documentation on constructor
+		configuration for details), default: 1
 
 }
 
@@ -196,6 +201,11 @@ sub execute {
     if (ref($request) eq 'HASH') {
 	$params->{'cache'} = $request->{'cache'} || 0;
 	$params->{'select'} = $request->{'select'} || 0;
+	$params->{'commit'} = $self->{'config'}->{'autocommit'} ?
+			      1 :
+			      ( exists($request->{'commit'}) ?
+				$request->{'commit'} :
+				1 );
 	$request = shift;
     }
 
@@ -357,7 +367,7 @@ sub _request {
 		}
 
 	    }
-	    elsif (!$self->{'config'}->{'autocommit'}) {
+	    elsif (!$self->{'config'}->{'autocommit'} && $params->{'commit'}) {
 
 # everything fine, data from selective result obtained - commit changes to DB
 		log_it( 'debug',
@@ -373,7 +383,7 @@ sub _request {
 # everything fine, non-selective request succeed - commit changes to DB
 	    $result->{'data'} = 1;
 
-	    unless ($self->{'config'}->{'autocommit'}) {
+	    if (!$self->{'config'}->{'autocommit'} && $params->{'commit'}) {
 
 		log_it( 'debug',
 			$self->{'name'} .

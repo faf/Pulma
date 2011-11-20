@@ -9,12 +9,12 @@
 # Data module configuration #####################################################
     'data' => {
 	'type' => 'localdb',
+	'failsafe' => 1,
 	'data' => {
 	    'driver' => 'SQLite',
 	    'dsn' => '/opt/pulma/usr/db/data.db',
 	    'user' => '',
 	    'passwd' => '',
-	    'autocommit' => 1,
 	    'init' => [
 		{ 'method' => 'sqlite_enable_load_extension',
 		  'args' => [ '1' ] },
@@ -28,12 +28,12 @@
 # Authorization module configuration ############################################
     'auth' => {
 	'type' => 'localdb',
+	'failsafe' => 1,
 	'data' => {
 	    'driver' => 'SQLite',
 	    'dsn' => '/opt/pulma/usr/db/auth.db',
 	    'user' => '',
 	    'passwd' => '',
-	    'autocommit' => 1,
 	    'init' => [
 		{ 'method' => 'sqlite_enable_load_extension',
 		  'args' => [ '1' ] },
@@ -48,12 +48,12 @@
 
     'logger' => {
 	'type' => 'localdb',
+	'failsafe' => 1,
 	'data' => {
 	    'driver' => 'SQLite',
 	    'dsn' => '/opt/pulma/usr/db/logger.db',
 	    'user' => '',
 	    'passwd' => '',
-	    'autocommit' => 1,
 	    'init' => [
 		{ 'method' => 'sqlite_enable_load_extension',
 		  'args' => [ '1' ] },

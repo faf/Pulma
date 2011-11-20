@@ -90,6 +90,13 @@ sub new {
 
 	log_it('debug', $self->{'name'} . '::new: initializing DB object');
 
+# set failsafe mode
+	if (exists($config->{'failsafe'}) && $config->{'failsafe'}) {
+
+	    $config->{'data'}->{'autocommit'} = 0;
+
+	}
+
 # initialize object to work with local DB (or get it from cache if exists)
 	$self->{'db'} = $cache->{$self->{'name'} . '_db'} ||
 			    Pulma::Core::DB->new($config->{'data'});
@@ -642,7 +649,9 @@ sub create_entity {
 	}
 
 # try to create entity
-	my $res = $self->{'db'}->execute( {'select' => 0, 'cache' => 1},
+	my $res = $self->{'db'}->execute( { 'select' => 0,
+					    'cache' => 1,
+					    'commit' => ($self->{'config'}->{'failsafe'} ? 0 : 1) },
 					  'insert into entities (id, etype, modtime) values (?, ?, ?)',
 					  $entity->{'id'}, $entity->{'etype'}, $entity->{'modtime'} );
 
@@ -836,7 +845,7 @@ sub update_entity {
 	}
 
 # try to delete old entity's attributes
-	if (!$self->_delete_entity_attributes($entity)) {
+	if (!$self->_delete_entity_attributes($entity, 0)) {
 
 	    log_it( 'err',
 		    $self->{'name'} .
@@ -863,7 +872,9 @@ sub update_entity {
 
 	$entity->{'modtime'} = time;
 
-	my $res = $self->{'db'}->execute( {'select' => 0, 'cache' => 1},
+	my $res = $self->{'db'}->execute( { 'select' => 0,
+					    'cache' => 1,
+					    'commit' => ($self->{'config'}->{'failsafe'} ? 0 : 1) },
 					  'update entities set modtime = ? where id = ? and etype = ?',
 					  $entity->{'modtime'}, $entity->{'id'}, $entity->{'etype'} );
 
@@ -1001,7 +1012,9 @@ sub delete_entity {
 		    '::delete_entity: deleting entity with id %s and of type %s',
 		$entity->{'id'}, $entity->{'etype'} );
 
-	my $res = $self->{'db'}->execute( {'select' => 0, 'cache' => 1},
+	my $res = $self->{'db'}->execute( { 'select' => 0,
+					    'cache' => 1,
+					    'commit' => ($self->{'config'}->{'failsafe'} ? 0 : 1) },
 					  'delete from entities where id = ? and etype = ?',
 					  $entity->{'id'}, $entity->{'etype'});
 
@@ -1439,7 +1452,12 @@ sub _store_entity_attributes {
 
     }
 
+    my $counter = scalar(keys(%{$entity->{'attributes'}}));
     foreach my $attribute (keys(%{$entity->{'attributes'}})) {
+
+	last if (!$result && $self->{'config'}->{'failsafe'});
+
+	$counter--;
 
 # validate structure of all attributes (should be arrays, see structure of the
 # entity hash)
@@ -1460,7 +1478,9 @@ sub _store_entity_attributes {
 	foreach my $value (@{$entity->{'attributes'}->{$attribute}}) {
 
 # ...each of attribute's values
-	    my $res = $self->{'db'}->execute( {'select' => 0, 'cache' => 1},
+	    my $res = $self->{'db'}->execute( { 'select' => 0,
+						'cache' => 1,
+						'commit' => ($self->{'config'}->{'failsafe'} ? ($counter ? 0 : 1) : 1) },
 					      'insert into attributes (entity, name, val) values (?, ?, ?)',
 					      $entity->{'id'}, $attribute, $value );
 
@@ -1472,6 +1492,7 @@ sub _store_entity_attributes {
 			$attribute, $entity->{'id'}, $res->{'error'} );
 
 		$result &&= 0;
+		last if $self->{'config'}->{'failsafe'};
 
 	    }
 	    elsif (!$res->{'data'}) {
@@ -1482,6 +1503,7 @@ sub _store_entity_attributes {
 			$attribute, $entity->{'id'} );
 
 		$result &&= 0;
+		last if $self->{'config'}->{'failsafe'};
 
 	    }
 	    else {
@@ -1503,12 +1525,16 @@ sub _store_entity_attributes {
 #	Method to delete all attributes of the given entity
 # Argument(s)
 #	1. (link to hash) entity
+#	2. (boolean) flag to commit deletions (optional, useful only in
+#	   failsafe mode, default: true)
 # Returns
 #	1 on success or 1 on error
 
 sub _delete_entity_attributes {
     my $self = shift;
     my $entity = shift;
+    my $commit = shift;
+    $commit = 1 unless defined $commit;
 
 # check type of data source
     if ($self->{'config'}->{'type'} ne 'localdb') {
@@ -1525,7 +1551,9 @@ sub _delete_entity_attributes {
 # data source: local DB
 
 # try to delete attributes
-    my $res = $self->{'db'}->execute( {'select' => 0, 'cache' => 1},
+    my $res = $self->{'db'}->execute( { 'select' => 0,
+					'cache' => 1,
+					'commit' => ($self->{'config'}->{'failsafe'} ? $commit : 1) },
 				      'delete from attributes where entity = ?',
 				      $entity->{'id'} );
 
