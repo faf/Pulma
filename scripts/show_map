@@ -1,0 +1,155 @@
+#!/usr/bin/perl
+=head1 Pulma map viewer
+
+Part of Pulma system
+
+Script to view actual requests map of Pulma system
+
+Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
+
+use strict;
+use warnings;
+
+use lib qw( ../ );
+
+use Pulma::Service::Data::Parser;
+
+use Getopt::Long qw(:config no_ignore_case bundling no_auto_abbrev);
+use Pod::Usage;
+
+=head1 Usage
+
+=over
+
+=item show_map --config <Pulma configuration file>
+
+=item I<or>
+
+=item show_map --help
+
+=back
+
+=cut
+
+# get options
+my $options = {};
+our @files;
+
+unless ( GetOptions( $options,
+		     'help|h',
+		     'config|c=s' ) ) {
+
+    pod2usage(-exitval => 1, -verbose => 2);
+
+}
+
+if (exists($options->{'help'})) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+# check specified configuration file
+unless (-r $options->{'config'}) {
+
+    print STDERR
+	  sprintf( "[error] Configuration file %s not exist or not readable!\n",
+		   $options->{'config'} );
+    exit(1);
+
+}
+
+# get configuration
+my $config = do($options->{'config'});
+if ($@) {
+
+    print STDERR sprintf("[error] Bad configuration format: %s\n", $@);
+    exit(1);
+
+}
+elsif (!defined $config) {
+
+    print STDERR sprintf("[error] Can't read configuration: %s\n", $!);
+    exit(1);
+
+}
+
+unless ( exists($config->{'map'}) &&
+	 exists($config->{'map'}->{'file'}) ) {
+
+    print STDERR
+	  "[error] Invalid configuration: can't find complete map section with filename!";
+    exit(1);
+
+}
+
+unless (-r $config->{'map'}->{'file'}) {
+
+    print STDERR sprintf( "[error] Map file '%s' not exist or not readable!\n",
+			  $config->{'map'}->{'file'} );
+    exit(1);
+
+}
+
+# read data from file
+my @contents;
+if (open(IN, "<", $config->{'map'}->{'file'})) {
+
+    @contents = <IN>;
+
+    unless (close(IN)) {
+
+	print STDERR
+	      sprintf( "[error] Something weird: can't close map file '%s': %s\n",
+		       $config->{'map'}->{'file'}, $! );
+
+	exit(1);
+
+    }
+
+}
+else {
+
+    print STDERR sprintf( "[error] Can't open map file '%s' for read: %s\n",
+			  $config->{'map'}->{'file'}, $! );
+    exit(1);
+
+}
+
+# initialize data parser
+my $parser = Pulma::Service::Data::Parser->new();
+
+# parse data
+my $data = $parser->decode(join('', @contents));
+unless (defined $data) {
+
+    print STDERR sprintf( "[error] Data structure in map file '%s' is invalid.\n",
+			  $config->{'map'}->{'file'} );
+
+    exit(1);
+
+}
+
+my @paths;
+foreach (keys(%$data)) {
+
+    push (@paths, $_) unless (/^\/.*[^\/]$/);
+
+}
+
+print join("\n", sort(@paths));
+print "\n";
