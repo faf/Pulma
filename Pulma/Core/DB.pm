@@ -617,13 +617,27 @@ sub _connect {
 			$self->{'name'} .
 			    "::_connect: init command number %s successfully executed",
 			$counter );
+
+		unless ($self->{'config'}->{'autocommit'}) {
+
+		    $self->{'connection'}->commit();
+
+		}
+
 	    }
 	    else {
 
 		log_it( 'err',
 			$self->{'name'} .
-			    "::_connect: failed to execute initial command number %s",
-			$counter );
+			    "::_connect: failed to execute initial command number %s: %s",
+			$counter, $self->{'connection'}->errstr() );
+
+		unless ($self->{'config'}->{'autocommit'}) {
+
+		    $self->{'connection'}->rollback();
+
+		}
+
 	    }
 
 	}
@@ -641,6 +655,12 @@ sub _connect {
 			    "::_connect: init method number %s called, got result: %s",
 			$counter, Dumper($res) );
 
+		unless ($self->{'config'}->{'autocommit'}) {
+
+		    $self->{'connection'}->commit();
+
+		}
+
 	    }
 	    else {
 
@@ -648,6 +668,12 @@ sub _connect {
 			$self->{'name'} .
 			    "::_connect: failed to execute initial command number %s: invalid hash structure",
 			$counter );
+
+		unless ($self->{'config'}->{'autocommit'}) {
+
+		    $self->{'connection'}->rollback();
+
+		}
 
 	    }
 	}
