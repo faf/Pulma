@@ -200,18 +200,45 @@ foreach my $file (@files) {
 
     }
 
-# import data
-    my $res = $dest->create_entity($data);
-    unless ($res) {
+    my $entities;
 
-	print STDERR
-	      "[error] Error on data import! Maybe entity already exists?\n";
+    if (ref($data) eq 'HASH') {
+
+	$entities = [ $data ];
+
+    }
+    elsif (ref($data) eq 'ARRAY') {
+
+	$entities = $data;
 
     }
     else {
 
-	print "[info] Data successfully inserted.\n"
-				unless ($options->{'quiet'});
+	print STDERR
+	      sprintf( "[error] Data structure in file '%s' is invalid. Expected hash or array, got: %s\n",
+		       $file, ref($data) );
+
+	next;
+
+    }
+
+
+# import data
+    foreach (@$entities) {
+
+	my $res = $dest->create_entity($_);
+	unless ($res) {
+
+	    print STDERR
+		  "[error] Error on data import! Maybe entity already exists?\n";
+
+	}
+	else {
+
+	    print "[info] Data successfully inserted.\n"
+				    unless ($options->{'quiet'});
+
+	}
 
     }
 
