@@ -7,6 +7,9 @@ create table entities (
     modtime	int(4) not null default 0
 );
 
+create index entities_id_idx on entities(id);
+create index entities_etype_idx on entities(etype);
+
 -- entities' attributes
 create table attributes (
 -- entity id
@@ -16,3 +19,5 @@ create table attributes (
 -- value of entity's attribute
     val		text not null default ''
 );
+
+create index attributes_entity_idx on attributes(entity);
