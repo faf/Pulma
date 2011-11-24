@@ -166,7 +166,7 @@ sub request {
 		    'method' => request_method(),
 		    'remoteip' => http('X-Real-IP') || http('X-Forwarded-For') || remote_addr(),
 		    'useragent' => user_agent(),
-		    'urlbase' => url(-base => 1),
+		    'urlbase' => url(-base => 1) . $self->{'config'}->{'root'},
 		    'url' => url(-absolute => 1, -path => 1),
 		    'fullurl' => url(-absolute => 1, -query => 1, -path => 1),
 		    'query' => query_string()
