@@ -47,7 +47,6 @@ use Pod::Usage;
 
 # get options
 my $options = {};
-our @files;
 
 unless ( GetOptions( $options,
 		     'help|h',
