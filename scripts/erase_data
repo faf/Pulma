@@ -1,0 +1,279 @@
+#!/usr/bin/perl
+=head1 Pulma data eraser
+
+Part of Pulma system
+
+Script to erase data in data source
+
+Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
+
+use strict;
+use warnings;
+
+use lib qw( ../ );
+
+use Pulma::Auth;
+use Pulma::Data;
+use Pulma::Logger;
+
+use Pulma::Service::Data::Parser;
+use Pulma::Service::Functions;
+
+use Encode;
+use Getopt::Long qw(:config no_ignore_case bundling no_auto_abbrev);
+use Pod::Usage;
+
+=head1 Usage
+
+=over
+
+=item erase_data [--quiet] --config <Pulma configuration file> --from
+<data|auth|logger> --etype <entity type> [--age <max age as unix timestamp>]
+[--file <file1> [, --file <file2>, ...]]
+
+=item I<or>
+
+=item erase_data --help
+
+=back
+
+When used in quiet mode only errors will be displayed
+
+Files should contain filters for entities selection (see documentation on
+Pulma::Data for details)
+
+=cut
+
+# get options
+my $options = {};
+our @files;
+
+unless ( GetOptions( $options,
+		     'help|h',
+		     'config|c=s',
+		     'from=s',
+		     'etype=s',
+		     'age=s',
+		     'quiet|q',
+		     'file|f=s' => \@files) ) {
+
+    pod2usage(-exitval => 1, -verbose => 2);
+
+}
+
+if (exists($options->{'help'})) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !exists($options->{'config'}) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !exists($options->{'from'}) || !exists($options->{'etype'}) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( exists($options->{'age'}) && !check_number($options->{'age'}) ) {
+
+    print STDERR "Invalid age specified!\n";
+
+}
+
+# check specified configuration file
+unless (-r $options->{'config'}) {
+
+    print STDERR
+	  sprintf( "[error] Configuration file %s not exist or not readable!\n",
+		   $options->{'config'} );
+    exit(1);
+
+}
+
+# get configuration
+my $config = do($options->{'config'});
+if ($@) {
+
+    print STDERR sprintf("[error] Bad configuration format: %s\n", $@);
+    exit(1);
+
+}
+elsif (!defined $config) {
+
+    print STDERR sprintf("[error] Can't read configuration: %s\n", $!);
+    exit(1);
+
+}
+
+# initialize data source object
+my $data;
+my $null = {};
+if ($options->{'from'} eq 'data') {
+
+    $data = Pulma::Data->new($config->{'data'}, \$null);
+
+}
+elsif ($options->{'from'} eq 'auth') {
+
+    $data = Pulma::Auth->new($config->{'auth'}, \$null);
+
+
+}
+elsif ($options->{'from'} eq 'logger') {
+
+    $data = Pulma::Logger->new($config->{'logger'}, \$null);
+
+}
+else {
+
+    print STDERR sprintf( "[error] Unknown data source '%s'!\n",
+			  $options->{'to'} );
+    exit(1);
+
+}
+
+unless ($data) {
+
+    print STDERR sprintf( "[error] Can't initialize data object '%s'\n",
+			  $options->{'to'} );
+    exit(1);
+
+}
+
+# initialize data parser
+my $parser = Pulma::Service::Data::Parser->new();
+
+# construct filters (if need to)
+my @filters;
+if (scalar(@files)) {
+
+    foreach my $file (@files) {
+
+# read data from file
+	my @contents;
+	if (open(IN, "<:encoding(utf-8)", $file)) {
+
+	    @contents = <IN>;
+
+	    unless (close(IN)) {
+
+		print STDERR
+		    sprintf( "[error] Something weird: can't close file '%s': %s\n",
+			     $file, $! );
+
+		print STDERR "[error] Aborting\n";
+		exit(1);
+
+	    }
+
+	}
+	else {
+
+	    print STDERR sprintf( "[error] Can't open file '%s' for read: %s\n",
+				  $file, $! );
+	    print STDERR "[error] Aborting\n";
+	    exit(1);
+
+	}
+
+# parse data
+	my $filter = $parser->decode(join('', @contents));
+	unless (defined $filter) {
+
+	    print STDERR sprintf( "[error] Data structure in file '%s' is invalid.\n",
+				  $file );
+	    print STDERR "[error] Aborting\n";
+	    exit(1);
+
+	}
+
+	if (ref($filter) eq 'HASH') {
+
+	    push (@filters, [ $filter ]);
+
+	}
+	elsif (ref($filter) eq 'ARRAY') {
+
+	    push (@filters, $filter);
+
+	}
+	else {
+
+	    print STDERR
+		  sprintf( "[error] Data structure in file '%s' is invalid. Expected hash or array, got: %s\n",
+			   $file, ref($filter) );
+	    print STDERR "[error] Aborting\n";
+	    exit(1);
+
+	}
+
+    }
+
+}
+
+my $result;
+if (exists($options->{'age'})) {
+# age specified
+# get all entities of a given type
+    my $entities = $data->get_entities( \@filters, $options->{'etype'} );
+
+    $result = { 'deleted' => 0, 'failed' => 0 };
+
+    foreach my $entity (@$entities) {
+
+	if ($entity->{'modtime'} < $options->{'age'}) {
+# found old entity
+
+	    if ($data->delete_entity($entity)) {
+
+		$result->{'deleted'}++;
+
+	    }
+	    else {
+
+		$result->{'failed'}++;
+
+	    }
+
+	}
+
+    }
+
+}
+else {
+# age not specified, kill 'em all
+
+    $result = $data->delete_entities( \@filters, $options->{'etype'} );
+
+}
+
+unless ($options->{'quite'}) {
+
+    printf ( "[info] Deleted %s entities\n", $result->{'deleted'} );
+
+}
+if ($result->{'failed'}) {
+
+    print STDERR sprintf( "[error] Failed to delete %s entities\n",
+			  $result->{'failed'} );
+
+}
