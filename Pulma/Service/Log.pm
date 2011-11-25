@@ -42,28 +42,28 @@ see module Sys::Syslog for more details
 
 =cut
 our $Level;
-$Level = 2 unless defined $Level;
+$Level = -1 unless defined $Level;
 
 =head2 Pulma::Service::Log::Ident
 
 =cut
 
 our $Ident;
-$Ident = '' unless defined $Ident;
+$Ident = 'pulma' unless defined $Ident;
 
 =head2 Pulma::Service::Log::Logopt
 
 =cut
 
 our $Logopt;
-$Logopt = '' unless defined $Logopt;
+$Logopt = 'pid|cons|nofatal' unless defined $Logopt;
 
 =head2 Pulma::Service::Log::Facility
 
 =cut
 
 our $Facility;
-$Facility = '' unless defined $Facility;
+$Facility = 'daemon' unless defined $Facility;
 
 =head1 Function: Pulma::Service::Log::ExtLog
 
