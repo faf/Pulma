@@ -62,6 +62,12 @@ if (exists($options->{'help'})) {
 
 }
 
+unless ( exists($options->{'config'}) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
 # check specified configuration file
 unless (-r $options->{'config'}) {
 
