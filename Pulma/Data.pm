@@ -1438,7 +1438,7 @@ sub _store_entity_attributes {
 # data source: local DB
 
     my $result = 1;
-
+    my $commited = 0;
 # validate structure of the attributes of the entity (should be anonymous hash,
 # see structure of the entity hash)
     unless (ref($entity->{'attributes'}) eq 'HASH') {
@@ -1477,6 +1477,17 @@ sub _store_entity_attributes {
 # try to store attribute
 	foreach my $value (@{$entity->{'attributes'}->{$attribute}}) {
 
+	    unless (defined $value) {
+
+		log_it( 'debug',
+			$self->{'name'} .
+			    "::_store_entity_attributes: skipped undefined value of attribute %s while storing attributes of entity with id %s",
+			$attribute, $entity->{'id'} );
+
+		next;
+
+	    }
+
 # ...each of attribute's values
 	    my $res = $self->{'db'}->execute( { 'select' => 0,
 						'cache' => 1,
@@ -1513,8 +1524,50 @@ sub _store_entity_attributes {
 			    "::_store_entity_attributes: attribute %s for entity with id %s successfully stored",
 			$attribute, $entity->{'id'} );
 
+		$commited = 1 unless $counter;
+
 	    }
 	}
+    }
+
+# if "storing" empty attributes in failsafe mode - should commit changes via
+# pseudo-request
+    if ( !$commited && $self->{'config'}->{'failsafe'} ) {
+
+	my $res = $self->{'db'}->execute( { 'select' => 0,
+					    'cache' => 0,
+					    'commit' => 1 },
+					  'select 1' );
+
+	if (exists($res->{'error'})) {
+
+	    log_it( 'err',
+		    $self->{'name'} .
+			"::_store_entity_attributes: can't commit storing of empty attributes for entity with id %s and of type %s via pseudo request: %s",
+		    $entity->{'id'}, $entity->{'etype'}, $res->{'error'} );
+
+	    return 0;
+
+	}
+	elsif (!$res->{'data'}) {
+
+	    log_it( 'err',
+		    $self->{'name'} .
+			"::_store_entity_attributes: can't commit storing of empty attributes for entity with id %s and of type %s via pseudo request: something went wrong",
+		    $entity->{'id'}, $entity->{'etype'} );
+
+	    return 0;
+
+	}
+	else {
+
+	    log_it( 'debug',
+		    $self->{'name'} .
+			"::_store_entity_attributes: successfully stored empty attributes for entity with id %s and of type %s via pseudo request",
+		    $entity->{'id'}, $entity->{'etype'} );
+
+	}
+
     }
 
     return $result;
