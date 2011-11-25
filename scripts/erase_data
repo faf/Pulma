@@ -43,7 +43,7 @@ use Pod::Usage;
 
 =item erase_data [--quiet] --config <Pulma configuration file> --from
 <data|auth|logger> --etype <entity type> [--age <max age as unix timestamp>]
-[--file <file1> [, --file <file2>, ...]]
+[--filter <file1> [, --filter <file2>, ...]]
 
 =item I<or>
 
@@ -60,7 +60,7 @@ Pulma::Data for details)
 
 # get options
 my $options = {};
-our @files;
+my @files;
 
 unless ( GetOptions( $options,
 		     'help|h',
@@ -69,7 +69,7 @@ unless ( GetOptions( $options,
 		     'etype=s',
 		     'age=s',
 		     'quiet|q',
-		     'file|f=s' => \@files) ) {
+		     'filter|f=s' => \@files) ) {
 
     pod2usage(-exitval => 1, -verbose => 2);
 
@@ -146,7 +146,7 @@ elsif ($options->{'from'} eq 'logger') {
 else {
 
     print STDERR sprintf( "[error] Unknown data source '%s'!\n",
-			  $options->{'to'} );
+			  $options->{'from'} );
     exit(1);
 
 }
@@ -154,7 +154,7 @@ else {
 unless ($data) {
 
     print STDERR sprintf( "[error] Can't initialize data object '%s'\n",
-			  $options->{'to'} );
+			  $options->{'from'} );
     exit(1);
 
 }

@@ -55,7 +55,7 @@ When used in quiet mode only errors will be displayed
 
 # get options
 my $options = {};
-our @files;
+my @files;
 
 unless ( GetOptions( $options,
 		     'help|h',
