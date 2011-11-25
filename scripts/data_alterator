@@ -1,0 +1,271 @@
+#!/usr/bin/perl
+=head1 Pulma data alterator
+
+Part of Pulma system
+
+Script to add (or remove) attribute with a given name to (or from) entities
+of a given type
+
+Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
+
+use strict;
+use warnings;
+
+use lib qw( ../ );
+
+use Pulma::Auth;
+use Pulma::Data;
+use Pulma::Logger;
+
+use Clone qw( clone );
+use Getopt::Long qw(:config no_ignore_case bundling no_auto_abbrev);
+use Pod::Usage;
+
+=head1 Usage
+
+=over
+
+=item data_alterator [--quiet] --config <Pulma configuration file> --data
+<data|auth|logger> --etype <entity type> --attr <attribute name> [--remove]
+[--value <attribute value> [, --value <attribute value #2>, ...] ]
+
+=item I<or>
+
+=item data_alterator --help
+
+=back
+
+When used in quiet mode only errors will be displayed
+
+=cut
+
+# get options
+my $options = {};
+my @values;
+unless ( GetOptions( $options,
+		     'help|h',
+		     'config|c=s',
+		     'data=s',
+		     'etype=s',
+		     'attr=s',
+		     'remove',
+		     'value=s' => \@values,
+		     'quiet|q') ) {
+
+    pod2usage(-exitval => 1, -verbose => 2);
+
+}
+
+if (exists($options->{'help'})) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !exists($options->{'config'}) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !exists($options->{'data'}) || !exists($options->{'etype'}) ||
+     !exists($options->{'attr'}) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+# check specified configuration file
+unless (-r $options->{'config'}) {
+
+    print STDERR
+	  sprintf( "[error] Configuration file %s not exist or not readable!\n",
+		   $options->{'config'} );
+    exit(1);
+
+}
+
+# get configuration
+my $config = do($options->{'config'});
+if ($@) {
+
+    print STDERR sprintf("[error] Bad configuration format: %s\n", $@);
+    exit(1);
+
+}
+elsif (!defined $config) {
+
+    print STDERR sprintf("[error] Can't read configuration: %s\n", $!);
+    exit(1);
+
+}
+
+# initialize data source object
+my $data;
+my $null = {};
+if ($options->{'data'} eq 'data') {
+
+    $data = Pulma::Data->new($config->{'data'}, \$null);
+
+}
+elsif ($options->{'data'} eq 'auth') {
+
+    $data = Pulma::Auth->new($config->{'auth'}, \$null);
+
+
+}
+elsif ($options->{'data'} eq 'logger') {
+
+    $data = Pulma::Logger->new($config->{'logger'}, \$null);
+
+}
+else {
+
+    print STDERR sprintf( "[error] Unknown data source '%s'!\n",
+			  $options->{'data'} );
+    exit(1);
+
+}
+
+unless ($data) {
+
+    print STDERR sprintf( "[error] Can't initialize data object '%s'\n",
+			  $options->{'data'} );
+    exit(1);
+
+}
+
+# get entities
+my $entities = $data->get_entities([], $options->{'etype'});
+
+# alter entities
+my $result = { 'altered' => 0, 'failed' => 0, 'skipped' => 0 };
+foreach my $entity (@$entities) {
+
+    if ($options->{'remove'}) {
+# remove attribute from entity
+
+	unless (exists($entity->{'attributes'}->{$options->{'attr'}})) {
+# attribute not found, entity should not be altered, thus skipped
+	    $result->{'skipped'}++;
+	    next;
+	}
+
+	if (scalar(@values)) {
+	    my $change = 0;
+# remove only attributes with a given value(s)
+	    foreach my $value (@values) {
+		for ( my $i = 0;
+		      $i < scalar(@{$entity->{'attributes'}->{$options->{'attr'}}});
+		      $i++) {
+
+		    if ($value eq $entity->{'attributes'}->{$options->{'attr'}}->[$i]) {
+
+			delete $entity->{'attributes'}->{$options->{'attr'}}->[$i];
+			$change ||= 1;
+			last;
+
+		    }
+
+		}
+
+	    }
+
+	    unless ($change) {
+# attribute with a given value not found, entity should not be altered, thus skipped
+		$result->{'skipped'}++;
+		next;
+	    }
+	}
+	else {
+# value not specified, remove attribute at all
+	    delete $entity->{'attributes'}->{$options->{'attr'}};
+	}
+
+    }
+    else {
+# add attribute to entity
+
+	unless (exists($entity->{'attributes'}->{$options->{'attr'}})) {
+# attribute not found, add it to entity as is
+	    $entity->{'attributes'}->{$options->{'attr'}} = scalar(@values) ?
+							    \@values :
+							    [''];
+	}
+	elsif (!scalar(@values)) {
+# values to add not specified, while attribute exists, entity should not
+# be altered, thus skipped
+	    $result->{'skipped'}++;
+	    next;
+	}
+	else {
+# attribute found, values to add specified, determine, whether one should
+# alter entity or not
+	    my $change = 0;
+	    foreach my $value (@values) {
+		my $flag = 1;
+# clone attribute values in case of future altering
+		my $old_attrs = clone($entity->{'attributes'}->{$options->{'attr'}});
+		foreach my $attr (@$old_attrs) {
+		    if ($attr eq $value) {
+			$flag = 0;
+			last;
+		    }
+		}
+# given value of the attribute not found, entity should be changed
+		if ($flag) {
+		    push (@{$entity->{'attributes'}->{$options->{'attr'}}}, $value);
+		    $change ||= 1;
+		}
+	    }
+
+	    unless($change) {
+# all given values of the attribute already exists, entity should not be
+# changed, thus skipped
+		$result->{'skipped'}++;
+		next;
+	    }
+
+	}
+    }
+
+# try to alter entity
+    if ($data->update_entity($entity)) {
+
+	$result->{'altered'}++;
+
+    }
+    else {
+
+	$result->{'failed'}++;
+
+    }
+
+}
+
+unless ($options->{'quite'}) {
+
+    printf ( "[info] Altered %s entities\n", $result->{'altered'} );
+    printf ( "[info] Skipped %s entities\n", $result->{'skipped'} );
+
+}
+if ($result->{'failed'}) {
+
+    print STDERR sprintf( "[error] Failed to alter %s entities\n",
+			  $result->{'failed'} );
+
+}
