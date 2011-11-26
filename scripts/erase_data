@@ -268,7 +268,7 @@ else {
 
 unless ($options->{'quite'}) {
 
-    printf ( "[info] Deleted %s entities\n", $result->{'deleted'} );
+    printf "[info] Deleted %s entities\n", $result->{'deleted'};
 
 }
 if ($result->{'failed'}) {

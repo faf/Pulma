@@ -259,8 +259,8 @@ foreach my $entity (@$entities) {
 
 unless ($options->{'quite'}) {
 
-    printf ( "[info] Altered %s entities\n", $result->{'altered'} );
-    printf ( "[info] Skipped %s entities\n", $result->{'skipped'} );
+    printf "[info] Altered %s entities\n", $result->{'altered'};
+    printf "[info] Skipped %s entities\n", $result->{'skipped'};
 
 }
 if ($result->{'failed'}) {

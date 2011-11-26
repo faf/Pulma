@@ -432,7 +432,6 @@ sub check_uri {
     return $string =~ /$RE{URI}{HTTP}/ ? 1 : 0;
 }
 
-
 =head1 Function: escape
 
 =head2 Description

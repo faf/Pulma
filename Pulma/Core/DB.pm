@@ -31,7 +31,7 @@ use DBI;
 
 use Pulma::Service::Log;
 
-# make Dumper output short for syslog
+# make Dumper output short (for logging)
 $Data::Dumper::Indent = 0;
 $Data::Dumper::Terse = 1;
 
@@ -63,7 +63,8 @@ Class constructor
 
     'driver' => <DBI driver to use>,
 
-    'dsn' => <data source name> - string like 'dbname=<database name>;host=<host name>'
+    'dsn' => <data source name> - string like
+	     'dbname=<database name>;host=<host name>'
 	     (or just filename in case of SQLite dastabase)
 
     'user' => <username to use for database connection>

@@ -109,8 +109,6 @@ our @ExtLogArgs = ();
 our $ExtLog;
 $ExtLog = sub { return 1; } unless (defined $ExtLog && (ref($ExtLog) ne 'CODE'));
 
-
-
 =head1 Function: log_it
 
 =head2 Description

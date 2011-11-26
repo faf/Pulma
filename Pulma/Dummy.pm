@@ -79,7 +79,7 @@ sub new {
 
 =head2 Description
 
-Method to emulate search of entity by it's it's identifier
+Method to emulate search of entity by it's identifier
 
 =head2 Argument(s)
 

@@ -29,7 +29,6 @@ use Pulma::Service::Log;
 
 use Template;
 
-
 =head1 Method: new
 
 =head2 Description
