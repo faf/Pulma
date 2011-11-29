@@ -140,6 +140,9 @@ Method to get data entity by it's identifier
 
 =item 2. (string) entity type
 
+=item 3. (integer) time of the last modification of the entity as unix
+timestamp (optional)
+
 =back
 
 =head2 Returns
@@ -176,6 +179,8 @@ sub get_entity_by_id {
     my $self = shift;
     my $id = shift;
     my $etype = shift;
+    my $modtime = shift;
+    $modtime ||= 0;
 
     my $result = undef;
 
@@ -184,7 +189,36 @@ sub get_entity_by_id {
 
 # data source: local DB
 
-# try to get entity (id and time of last modification)
+# try to get entity from cache
+	if (exists($self->{'cache'})) {
+
+	    log_it( 'debug',
+		    $self->{'name'} .
+			'::get_entity_by_id: look for actual entity with id %s in cache',
+		    $id );
+
+	    my $data = $self->{'cache'}->get( $id, $modtime );
+	    if (defined $data) {
+
+		log_it( 'debug',
+			$self->{'name'} .
+			    '::get_entity_by_id: actual entity with id %s found in cache',
+			$id );
+
+		return $data;
+
+	    }
+	    else {
+
+		log_it( 'debug',
+			$self->{'name'} .
+			    '::get_entity_by_id: actual entity with id %s not found in cache',
+			$id );
+
+	    }
+	}
+
+# try to get entity (id and time of last modification) from database
 	my $entity = $self->{'db'}->execute( {'select' => 1, 'cache' => 1},
 					     'select id, modtime from entities where id = ? and etype = ?',
 					     $id, $etype);
@@ -219,36 +253,6 @@ sub get_entity_by_id {
 		    $self->{'name'} .
 			'::get_entity_by_id: successfully got entity by id %s',
 		    $id );
-
-# entity id is valid, look for this entity in cache
-	    if (exists($self->{'cache'})) {
-
-		log_it( 'debug',
-			$self->{'name'} .
-			    '::get_entity_by_id: look for actual entity with id %s in cache',
-			$id );
-
-		my $data = $self->{'cache'}->get( $id,
-						  $entity->{'data'}->[0]->{'modtime'} );
-		if (defined $data) {
-
-		    log_it( 'debug',
-			    $self->{'name'} .
-				'::get_entity_by_id: actual entity with id %s found in cache',
-			    $id );
-
-		    return $data;
-
-		}
-		else {
-
-		    log_it( 'debug',
-			    $self->{'name'} .
-				'::get_entity_by_id: actual entity with id %s not found in cache',
-			    $id );
-
-		}
-	    }
 
 # prepare entity hash
 	    $result = {
@@ -452,7 +456,7 @@ sub get_entities {
 
 	foreach my $entity (@$entities) {
 
-	    push (@$result, $self->get_entity_by_id($entity, $etype));
+	    push (@$result, $self->get_entity_by_id($entity->{'id'}, $etype, $entity->{'modtime'}));
 
 	}
 
@@ -1131,7 +1135,7 @@ sub delete_entities {
 
 	foreach my $entity (@$entities) {
 
-	    my $res = $self->delete_entity( { 'id' => $entity,
+	    my $res = $self->delete_entity( { 'id' => $entity->{'id'},
 					      'etype' => $etype } );
 
 	    if ($res) {
@@ -1170,7 +1174,8 @@ sub delete_entities {
 #	3. (integer) entities limit (optional, default: no limits)
 #	4. (integer) offset (optional, default: no offset)
 # Returns
-#	(link to array) entities (as an array of ids)
+#	(link to array) entities (as an array of hashes with ids and timestamps
+#			of last modification)
 
 sub _get_entities_from_localdb {
     my $self = shift;
@@ -1192,6 +1197,7 @@ sub _get_entities_from_localdb {
     }
 
     my $results = {};
+    my $modtimes = {};
 
     if (scalar(@$filters)) {
 
@@ -1201,7 +1207,7 @@ sub _get_entities_from_localdb {
 	my $first = 1;
 	foreach my $filter (@$filters) {
 # construct DB request for the filter
-	    my $request = 'select distinct(entity) from attributes as a, entities as b where b.id = a.entity and etype = ?';
+	    my $request = 'select distinct(entity) as entity, modtime from attributes as a, entities as b where b.id = a.entity and etype = ?';
 	    my @args = ($etype);
 	    my $sort = '';
 	    unless (ref($filter) eq 'ARRAY') {
@@ -1317,6 +1323,7 @@ sub _get_entities_from_localdb {
 	    foreach (@{$res->{'data'}}) {
 
 		$new_results->{$_->{'entity'}} = ($sort ne '') ? ++$count : $count;
+		$modtimes->{$_->{'entity'}} ||= $_->{'modtime'};
 
 	    }
 
@@ -1363,7 +1370,7 @@ sub _get_entities_from_localdb {
 
 # filters not specified => get all entities
 
-	my $request = 'select distinct(id) as id from entities where etype = ?';
+	my $request = 'select distinct(id) as id, modtime from entities where etype = ?';
 	my $res = $self->{'db'}->execute( {'select' => 1, 'cache' => 1},
 					  $request,
 					  $etype );
@@ -1385,13 +1392,14 @@ sub _get_entities_from_localdb {
 
 	    foreach (@{$res->{'data'}}) {
 		$results->{$_->{'id'}} = 1;
+		$modtimes->{$_->{'id'}} ||= $_->{'modtime'};
 	    }
 
 	}
 
     }
 
-# finally return ids of filtered entities
+# finally return list of filtered entities
 
 # sort entities
     my @result = sort {$results->{$a} <=> $results->{$b} } keys(%$results);
@@ -1408,7 +1416,13 @@ sub _get_entities_from_localdb {
 	}
     }
 
-    return \@result;
+# add timestamps of last modification to the final result
+    my $final_result = [];
+    foreach (@result) {
+	push (@$final_result, {'id' => $_, 'modtime' => $modtimes->{$_} || 0});
+    }
+
+    return $final_result;
 }
 
 # Method: _store_entity_attributes
