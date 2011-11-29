@@ -42,8 +42,8 @@ use Pod::Usage;
 =over
 
 =item erase_data [--quiet] --config <Pulma configuration file> --from
-<data|auth|logger> --etype <entity type> [--age <max age as unix timestamp>]
-[--filter <file1> [, --filter <file2>, ...]]
+<data|auth|logger> --etype <entity type> [--etype <entity type2>, ...]
+[--age <max age as unix timestamp>] [--filter <file1> [, --filter <file2>, ...]]
 
 =item I<or>
 
@@ -61,12 +61,13 @@ Pulma::Data for details)
 # get options
 my $options = {};
 my @files;
+my @etypes;
 
 unless ( GetOptions( $options,
 		     'help|h',
 		     'config|c=s',
 		     'from=s',
-		     'etype=s',
+		     'etype=s' => \@etypes,
 		     'age=s',
 		     'quiet|q',
 		     'filter|f=s' => \@files) ) {
@@ -87,7 +88,7 @@ if ( !exists($options->{'config'}) ) {
 
 }
 
-if ( !exists($options->{'from'}) || !exists($options->{'etype'}) ) {
+if ( !exists($options->{'from'}) || !scalar(@etypes) ) {
 
     pod2usage(-exitval => 0, -verbose => 2);
 
@@ -230,50 +231,57 @@ if (scalar(@files)) {
 
 }
 
-my $result;
-if (exists($options->{'age'})) {
+foreach my $etype (@etypes) {
+
+    my $result;
+
+    if (exists($options->{'age'})) {
 # age specified
 # get all entities of a given type
-    my $entities = $data->get_entities( \@filters, $options->{'etype'} );
+	my $entities = $data->get_entities( \@filters, $etype );
 
-    $result = { 'deleted' => 0, 'failed' => 0 };
+	$result = { 'deleted' => 0, 'failed' => 0 };
 
-    foreach my $entity (@$entities) {
+	foreach my $entity (@$entities) {
 
-	if ($entity->{'modtime'} < $options->{'age'}) {
+	    if ($entity->{'modtime'} < $options->{'age'}) {
 # found old entity
 
-	    if ($data->delete_entity($entity)) {
+		if ($data->delete_entity($entity)) {
 
-		$result->{'deleted'}++;
+		    $result->{'deleted'}++;
 
-	    }
-	    else {
+		}
+		else {
 
-		$result->{'failed'}++;
+		    $result->{'failed'}++;
+
+		}
 
 	    }
 
 	}
 
     }
-
-}
-else {
+    else {
 # age not specified, kill 'em all
 
-    $result = $data->delete_entities( \@filters, $options->{'etype'} );
+	$result = $data->delete_entities( \@filters, $etype );
 
-}
+    }
 
-unless ($options->{'quite'}) {
+    unless ($options->{'quite'}) {
 
-    printf "[info] Deleted %s entities\n", $result->{'deleted'};
+	printf "[info] Deleted %s entities of type '%s'\n",
+	       $result->{'deleted'}, $etype;
 
-}
-if ($result->{'failed'}) {
+    }
+    if ($result->{'failed'}) {
 
-    print STDERR sprintf( "[error] Failed to delete %s entities\n",
-			  $result->{'failed'} );
+	print STDERR
+	      sprintf( "[error] Failed to delete %s entities of type '%s'\n",
+		       $result->{'failed'}, $etype );
+
+    }
 
 }
