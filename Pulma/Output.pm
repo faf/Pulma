@@ -68,14 +68,15 @@ sub new {
     };
 
 # initialize Templates Toolkit object
-    $self->{'output'} = Template->new( {    ABSOLUTE            => 1,
-                                            RELATIVE            => 1,
-                                            INTERPOLATE         => 0,
-                                            POST_CHOMP          => 1,
-                                            COMPILE_EXT         => '.tt2',
-                                            COMPILE_DIR         => $config->{'cache'},
-                                            INCLUDE_PATH        => $config->{'templates'},
-                                            EVAL_PERL           => 1
+    $self->{'output'} = Template->new( {    ABSOLUTE		=> 1,
+					    RELATIVE		=> 1,
+					    INTERPOLATE		=> 0,
+					    POST_CHOMP		=> 1,
+					    COMPILE_EXT		=> '.tt2',
+					    COMPILE_DIR		=> $config->{'cache'},
+					    INCLUDE_PATH	=> $config->{'templates'},
+					    EVAL_PERL		=> 1,
+					    ENCODING		=> 'utf8'
     } );
 
     return bless($self, $package);
@@ -112,7 +113,10 @@ sub generate {
 
     my $result;
 
-    $self->{'output'}->process($data->{'result'}->{'template'}, $data, \$result);
+    $self->{'output'}->process( $data->{'result'}->{'template'},
+				$data,
+				\$result,
+				{ binmode => ":utf8" } );
 
     $data->{'result'}->{'document'} = $result;
 
