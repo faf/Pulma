@@ -180,7 +180,6 @@ sub get_entity_by_id {
     my $id = shift;
     my $etype = shift;
     my $modtime = shift;
-    $modtime ||= 0;
 
     my $result = undef;
 
@@ -189,8 +188,8 @@ sub get_entity_by_id {
 
 # data source: local DB
 
-# try to get entity from cache
-	if (exists($self->{'cache'})) {
+# try to get entity from cache (if modtime specified)
+	if ( exists($self->{'cache'}) && (defined $modtime) ) {
 
 	    log_it( 'debug',
 		    $self->{'name'} .
@@ -251,8 +250,27 @@ sub get_entity_by_id {
 
 	    log_it( 'debug',
 		    $self->{'name'} .
-			'::get_entity_by_id: successfully got entity by id %s',
+			'::get_entity_by_id: successfully got data frame for entity with id %s',
 		    $id );
+
+# try to get entity from cache if modtime wasn't specified
+	    if ( exists($self->{'cache'}) && !(defined $modtime) ) {
+
+		my $data = $self->{'cache'}->get( $id,
+						  $entity->{'data'}->[0]->{'modtime'} );
+
+		if (defined $data) {
+
+		    log_it( 'debug',
+			    $self->{'name'} .
+				'::get_entity_by_id: actual entity with id %s found in cache',
+			    $id );
+
+		    return $data;
+
+		}
+
+	    }
 
 # prepare entity hash
 	    $result = {
@@ -276,7 +294,6 @@ sub get_entity_by_id {
 	    else {
 
 # attributes obtained
-
 		foreach my $attribute (@{$attributes->{'data'}}) {
 		    if (exists($result->{'attributes'}->{$attribute->{'name'}})) {
 
@@ -290,7 +307,9 @@ sub get_entity_by_id {
 
 		    }
 		}
+
 	    }
+
 	}
 
 # store entity in cache (if have to)
@@ -366,11 +385,14 @@ B<or>
 { 'name' => <name>, 'sort' => (asc|desc|nasc|ndesc) }
 
 where <name> is a name of entity's attribute, <value> is the value of that
-attribute, and <operation> is one of '=', '<=', '>=', '<', '>', '<>', '~'
+attribute, and <operation> is one of '=', '<=', '>=', '<', '>', '<>', '~', '~~'
 
 B<NOTE!> '~' stands for regular expression match. value should be in form
 of B</regular expression/> In case of invalid regular expression or wrong
 form of value '~', operation degrades to the simple '=' operation.
+
+B<NOTE!> '~~' stands for case-insensitive regular expression match treating
+just like '~' operation described above.
 
 B<IMPORTANT!> One should be aware that (at least for localdb backend) sorting
 will work for the values of I<all> attributes used in condition, not only for
@@ -1242,10 +1264,11 @@ sub _get_entities_from_localdb {
 
 			my $value = $condition->{'value'};
 
-# check regular expression on '~' operation,
+# check regular expression on '~' or '~~' operations,
 # replace operation with '=' if regular expression is invalid, fix regular
 # expression otherwise
-			if ($condition->{'op'} eq '~') {
+			if ( ($condition->{'op'} eq '~') ||
+			     ($condition->{'op'} eq '~~') ) {
 
 			    unless ( ($condition->{'value'} =~ /^\/(.+)\/$/) &&
 				eval { '' =~ /$1/; 1 } ) {
@@ -1260,11 +1283,20 @@ sub _get_entities_from_localdb {
 			    }
 			}
 
-			$request .= '(name = ? and val ' .
-				    ( ($condition->{'op'} ne '~') ?
-					$condition->{'op'} :
-					'regexp' ) .
-				    ' ?)';
+			if ($condition->{'op'} eq '~~') {
+
+			    $request .= '(name = ? and lower(val) regexp lower(?))';
+
+			}
+			else {
+
+			    $request .= '(name = ? and val ' .
+					( ($condition->{'op'} ne '~') ?
+					    $condition->{'op'} :
+					    'regexp' ) .
+					' ?)';
+			}
+
 			push (@args, $condition->{'name'}, $value);
 
 		    }
@@ -1674,7 +1706,8 @@ sub _check_filter_operation {
 	     ($operation eq '<=') ||
 	     ($operation eq '>=') ||
 	     ($operation eq '<>') ||
-	     ($operation eq '~' ) );
+	     ($operation eq '~' ) ||
+	     ($operation eq '~~' ) );
 }
 
 # Function: _compare_attributes
