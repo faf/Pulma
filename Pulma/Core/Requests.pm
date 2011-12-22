@@ -164,9 +164,7 @@ sub request {
 		    'params' => $params,
 		    'cookies' => $cookies,
 		    'method' => request_method(),
-		    'remoteip' => http('X-Real-IP') ||
-				  http('X-Forwarded-For') ||
-				  remote_addr(),
+		    'remoteip' => remote_addr(),
 		    'useragent' => user_agent(),
 		    'urlbase' => url(-base => 1) . $self->{'config'}->{'root'},
 		    'url' => url(-absolute => 1, -path => 1),
