@@ -75,6 +75,9 @@ sub calculate_password_hash {
     my $username = shift;
     my $password = shift;
 
+    _utf8_off($username);
+    _utf8_off($password);
+
     return sha1_hex($username . $password);
 }
 
