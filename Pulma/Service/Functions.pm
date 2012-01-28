@@ -31,9 +31,9 @@ our @ISA = ('Exporter');
 our @EXPORT = qw( &calculate_password_hash &calculate_password_strength
 		  &check_color &check_date &check_email &check_login
 		  &check_number &check_sum &check_uri &escape &generate_entity_id
-		  &generate_rnd_string &make_http_date &pager &regexp_check
-		  &truncate_string &unescape &uri_escape &uri_escape_utf8
-		  &uri_unescape &uri_unescape_utf8);
+		  &generate_rnd_string &idn_url &make_http_date &pager
+		  &regexp_check &truncate_string &unescape &uri_escape
+		  &uri_escape_utf8 &uri_unescape &uri_unescape_utf8 );
 
 use CGI::Fast qw(:standard unescapeHTML);
 use Digest::MD5 qw(md5_hex);
@@ -41,6 +41,7 @@ use Digest::SHA1 qw(sha1_hex);
 use Email::Valid;
 use Encode qw(_utf8_on _utf8_off);
 use HTTP::Date;
+use Net::IDN::Encode qw(:all);
 use Regexp::Common qw(URI);
 use URI::Escape;
 
@@ -431,6 +432,7 @@ module)
 
 sub check_uri {
     my $string = shift;
+    $string = idn_url($string);
     $string =~ s/^https/http/;
     return $string =~ /$RE{URI}{HTTP}/ ? 1 : 0;
 }
@@ -542,6 +544,56 @@ sub generate_rnd_string {
     }
 
     return $str;
+}
+
+=head1 Function: idn_url
+
+=head2 Description
+
+Function to convert custom URL probably containing non-ASCII into valid IDN one
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) URL to convert
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (string) converted URL
+
+=back
+
+=cut
+
+sub idn_url {
+    my $string = shift;
+
+    my ($proto, @misc) = split(/\:\/\//, $string);
+    my $link = scalar(@misc) ? join('://', @misc) : $proto;
+    my ($url, $params, @garbage) = split(/\?/, $link);
+    if (scalar(@garbage)) {
+	$params .= join('?', @garbage);
+    }
+    if ($url =~ /[^A-Za-z0-9-]/) {
+	my ($host, @misc2) = split(/\//, $link);
+	$host = domain_to_ascii($host, UseSTD3ASCIIRules => 0);
+	my $params_flag = 0;
+	foreach (@misc2) {
+	    $_ = uri_escape($_);
+	}
+	$link = join('/', ($host, @misc2)) . ($params ? '?' . $params : '');
+    }
+    else {
+	$link = $string;
+    }
+    $link = scalar(@misc) ? $proto . '://' . $link : $link;
+
+    return $link;
 }
 
 =head1 Function: make_http_date
