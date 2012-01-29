@@ -31,7 +31,7 @@ our @ISA = ('Exporter');
 our @EXPORT = qw( &calculate_password_hash &calculate_password_strength
 		  &check_color &check_date &check_email &check_login
 		  &check_number &check_sum &check_uri &escape &generate_entity_id
-		  &generate_rnd_string &idn_url &make_http_date &pager
+		  &generate_rnd_string &idn_email &idn_url &make_http_date &pager
 		  &regexp_check &truncate_string &unescape &uri_escape
 		  &uri_escape_utf8 &uri_unescape &uri_unescape_utf8 );
 
@@ -279,6 +279,8 @@ sub check_email {
     my $email = shift;
     my $temp;
     my $result = {};
+
+    $email = idn_email($email);
 
     eval {
 	$temp = Email::Valid->address( -address => $email );
@@ -546,6 +548,44 @@ sub generate_rnd_string {
     return $str;
 }
 
+=head1 Function: idn_email
+
+=head2 Description
+
+Function to convert custom email address probably containing non-ASCII domain
+into valid IDN one
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) Email to convert
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (string) converted email or undef in case of error
+
+=back
+
+=cut
+
+sub idn_email {
+    my $email = shift;
+    _utf8_on($email);
+    eval {
+	$email = email_to_ascii($email, UseSTD3ASCIIRules => 0);
+    };
+    if ($@) {
+	$email = undef;
+    }
+    return $email;
+}
+
+
 =head1 Function: idn_url
 
 =head2 Description
@@ -564,7 +604,7 @@ Function to convert custom URL probably containing non-ASCII into valid IDN one
 
 =over
 
-=item (string) converted URL
+=item (string) converted URL or undef in case of error
 
 =back
 
@@ -581,7 +621,13 @@ sub idn_url {
     }
     if ($url =~ /[^A-Za-z0-9-]/) {
 	my ($host, @misc2) = split(/\//, $link);
-	$host = domain_to_ascii($host, UseSTD3ASCIIRules => 0);
+	_utf8_on($host);
+	eval {
+	    $host = domain_to_ascii($host, UseSTD3ASCIIRules => 0);
+	};
+	if ($@) {
+	    return undef;
+	}
 	my $params_flag = 0;
 	foreach (@misc2) {
 	    $_ = uri_escape($_);
