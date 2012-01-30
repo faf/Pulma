@@ -575,6 +575,9 @@ into valid IDN one
 
 sub idn_email {
     my $email = shift;
+
+    return undef unless $email;
+
     _utf8_on($email);
     eval {
 	$email = email_to_ascii($email, UseSTD3ASCIIRules => 0);
@@ -612,6 +615,8 @@ Function to convert custom URL probably containing non-ASCII into valid IDN one
 
 sub idn_url {
     my $string = shift;
+
+    return undef unless $string;
 
     my ($proto, @misc) = split(/\:\/\//, $string);
     my $link = scalar(@misc) ? join('://', @misc) : $proto;
