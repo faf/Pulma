@@ -100,7 +100,8 @@
         'proc_manager' => {
                             n_processes => 3,
                             start_delay => 0,
-                            die_timeout => 5
+                            die_timeout => 5,
+                            pm_title => 'pulma'
         },
 
 # binding
