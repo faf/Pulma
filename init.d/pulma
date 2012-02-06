@@ -55,6 +55,12 @@ stop()
 	RETVAL=$?
 }
 
+reload()
+{
+	stop_daemon --pidfile "$PIDFILE" --expect-user "$CGIUSER" -HUP -- "$NAME"
+	RETVAL=$?
+}
+
 # See how we were called.
 case "$1" in
 	start)
@@ -67,12 +73,15 @@ case "$1" in
 		stop
 		start
 		;;
+	reload)
+		reload
+		;;
 	status)
 		status --displayname "$DISPLAYNAME" --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user "$CGIUSER" $NAME
 		RETVAL=$?
 		;;
 	*)
-		msg_usage "${0##*/} {start|stop|restart|status}"
+		msg_usage "${0##*/} {start|stop|restart|reload|status}"
 		RETVAL=1
 esac
 

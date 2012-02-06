@@ -25,7 +25,7 @@ use strict;
 use warnings;
 use vars qw( $VERSION );
 
-$VERSION = "0.1.12";
+$VERSION = "0.2";
 
 # set this flag to prevent script to go into background
 my $_devel = 0;
@@ -50,6 +50,22 @@ BEGIN {
     $ENV{FCGI_LISTEN_QUEUE} = $config->{'fcgi'}->{'listen_queue'};
 
 }
+
+# 'monkey patch' for SIGHUP handling
+# see http://search.cpan.org/~gbjk/FCGI-ProcManager-0.19/ProcManager.pm for
+# details
+use FCGI;
+no strict 'refs';
+no warnings;
+*{'FCGI::Request'} = sub (;***$*$) {
+    my @defaults = (\*STDIN, \*STDOUT, \*STDERR, \%ENV, 0, FAIL_ACCEPT_ON_INTR());
+    $_[4] = fileno($_[4]) if defined($_[4]) && defined(fileno($_[4]));
+    splice @defaults,0,@_,@_;
+    RequestX(@defaults);
+};
+use strict 'refs';
+use warnings;
+# end of 'monkey patch'
 
 use CGI::Cookie;
 use CGI::Fast qw(remote_addr header cookie redirect cgi_error escapeHTML);
@@ -391,8 +407,7 @@ unless ($_devel) {
     }
 
 # ignore system signals
-# TODO: fix SIGHUP handling
-    $SIG{HUP} = $SIG{INT} = $SIG{PIPE} = 'IGNORE';
+    $SIG{INT} = $SIG{PIPE} = 'IGNORE';
 
 # redirect all standard descriptors to /dev/null
     for my $handle (*STDIN, *STDOUT, *STDERR) {
