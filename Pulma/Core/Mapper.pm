@@ -68,11 +68,21 @@ sub new {
 # store configuration
     $self->{'config'} = $config;
 
-# setup map file cacher
-    $self->{'file'} = Pulma::Cacher::File->new($config->{'file'});
-
 # setup data parser
     $self->{'parser'} = Pulma::Service::Data::Parser->new();
+
+# setup map file cacher(s)
+    $self->{'files'} = [];
+
+    if (ref($config->{'file'}) eq '') {
+	$config->{'file'} = [ $config->{'file'} ];
+    }
+
+    if (ref($config->{'file'}) eq 'ARRAY') {
+	foreach my $file (@{$config->{'file'}}) {
+	    push ( @{$self->{'files'}}, Pulma::Cacher::File->new($file) );
+	}
+    }
 
     return bless($self, $package);
 }
@@ -310,7 +320,15 @@ sub init_steps {
 sub _get_map {
     my $self = shift;
 
-    my $map = $self->{'parser'}->decode(join('',@{$self->{'file'}->get()->{'content'}}));
+    my $map;
+    foreach my $file (@{$self->{'files'}}) {
+	my $part = $self->{'parser'}->decode(join('',@{$file->get()->{'content'}}));
+	if (defined $part) {
+	    foreach (keys %$part) {
+		$map->{$_} = $part->{$_};
+	    }
+	}
+    }
 
     return defined($map) ? $map : undef;
 }

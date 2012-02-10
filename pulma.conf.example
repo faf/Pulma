@@ -2,6 +2,7 @@
 
 # Mapper configuration ##########################################################
     'map' => {
+# one can specify either a single mapping file or an array of such files
 	'file' => '/opt/pulma/mapping',
 	'root' => ''
     },
