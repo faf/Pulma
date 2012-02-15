@@ -1,0 +1,251 @@
+#!/usr/bin/perl
+=head1 Pulma data exporter
+
+Part of Pulma system
+
+Script to export data from data source into file
+
+Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
+
+use strict;
+use warnings;
+
+use lib qw( ../ );
+
+use Pulma::Auth;
+use Pulma::Data;
+use Pulma::Logger;
+
+use Pulma::Service::Data::Parser;
+
+use Encode;
+use Getopt::Long qw(:config no_ignore_case bundling no_auto_abbrev);
+use Pod::Usage;
+
+=head1 Usage
+
+=over
+
+=item export_data [--quiet] --config <Pulma configuration file>
+--from <data|auth|logger> --to <file> --etype <entity type>
+[--etype <entity type2>, ...] [--filter <file1> [, --filter <file2>, ...]]
+
+=item I<or>
+
+=item export_data --help
+
+=back
+
+When used in quiet mode only errors will be displayed
+
+=cut
+
+# get options
+my $options = {};
+my @files;
+my @etypes;
+unless ( GetOptions( $options,
+		     'help|h',
+		     'config|c=s',
+		     'from=s',
+		     'to=s',
+		     'etype=s' => \@etypes,
+		     'quiet|q',
+		     'filter|f=s' => \@files) ) {
+
+    pod2usage(-exitval => 1, -verbose => 2);
+
+}
+
+if (exists($options->{'help'})) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !exists($options->{'config'}) || !scalar(@etypes) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !exists($options->{'to'}) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+# check specified configuration file
+unless (-r $options->{'config'}) {
+
+    print STDERR
+	  sprintf( "[error] Configuration file %s not exist or not readable!\n",
+		   $options->{'config'} );
+    exit(1);
+
+}
+
+# get configuration
+my $config = do($options->{'config'});
+if ($@) {
+
+    print STDERR sprintf("[error] Bad configuration format: %s\n", $@);
+    exit(1);
+
+}
+elsif (!defined $config) {
+
+    print STDERR sprintf("[error] Can't read configuration: %s\n", $!);
+    exit(1);
+
+}
+
+# initialize data source object
+my $source;
+my $null = {};
+if ($options->{'from'} eq 'data') {
+
+    $source = Pulma::Data->new($config->{'data'}, \$null);
+
+}
+elsif ($options->{'from'} eq 'auth') {
+
+    $source = Pulma::Auth->new($config->{'auth'}, \$null);
+
+
+}
+elsif ($options->{'from'} eq 'logger') {
+
+    $source = Pulma::Logger->new($config->{'logger'}, \$null);
+
+}
+else {
+
+    print STDERR sprintf( "[error] Unknown data source '%s'!\n",
+			  $options->{'to'} );
+    exit(1);
+
+}
+
+unless ($source) {
+
+    print STDERR sprintf( "[error] Can't initialize data object '%s'\n",
+			  $options->{'to'} );
+    exit(1);
+
+}
+
+# initialize data parser
+my $parser = Pulma::Service::Data::Parser->new();
+
+# construct filters (if need to)
+my @filters;
+if (scalar(@files)) {
+
+    foreach my $file (@files) {
+
+# read data from file
+	my @contents;
+	if (open(IN, "<:encoding(utf-8)", $file)) {
+
+	    @contents = <IN>;
+
+	    unless (close(IN)) {
+
+		print STDERR
+		    sprintf( "[error] Something weird: can't close file '%s': %s\n",
+			     $file, $! );
+
+		print STDERR "[error] Aborting\n";
+		exit(1);
+
+	    }
+
+	}
+	else {
+
+	    print STDERR sprintf( "[error] Can't open file '%s' for read: %s\n",
+				  $file, $! );
+	    print STDERR "[error] Aborting\n";
+	    exit(1);
+
+	}
+
+# parse data
+	my $filter = $parser->decode(join('', @contents));
+	unless (defined $filter) {
+
+	    print STDERR sprintf( "[error] Data structure in file '%s' is invalid.\n",
+				  $file );
+	    print STDERR "[error] Aborting\n";
+	    exit(1);
+
+	}
+
+	if (ref($filter) eq 'HASH') {
+
+	    push (@filters, [ $filter ]);
+
+	}
+	elsif (ref($filter) eq 'ARRAY') {
+
+	    push (@filters, $filter);
+
+	}
+	else {
+
+	    print STDERR
+		  sprintf( "[error] Data structure in file '%s' is invalid. Expected hash or array, got: %s\n",
+			   $file, ref($filter) );
+	    print STDERR "[error] Aborting\n";
+	    exit(1);
+
+	}
+
+    }
+
+}
+
+# try to open destination file
+unless (open(OUT, ">:encoding(utf-8)", $options->{'to'})) {
+
+    print STDERR sprintf( "[error] Can't open file '%s' to export data into: %s\n",
+			  $options->{'to'}, $! );
+    exit(1);
+
+}
+
+# get all entities
+my $data = [];
+foreach my $etype (@etypes) {
+
+    my $entities = $source->get_entities( \@filters, $etype );
+
+    print sprintf( "[info] Got %s entities of type '%s'\n",
+	     scalar(@$entities), $etype ) unless $options->{'quiet'};
+
+    map { push(@$data, $parser->encode($_)); } @$entities;
+
+}
+
+print OUT "[" . (scalar(@$data) ? "\n" . join(",\n", @$data) . "\n" : '') . "]\n";
+
+unless (close(OUT)) {
+    print STDERR sprintf( "[error] Can't close export file '%s': %s\n",
+			  $options->{'to'}, $! );
+    exit(1);
+}
