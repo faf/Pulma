@@ -227,16 +227,18 @@ sub check_date {
 
     my $months = [0,31,28,31,30,31,30,31,31,30,31,30,31];
 
+    my $month = $2 + 0;
+    my $day = $3 + 0;
+
 # check day against value of days in month (except february)
-    return ($months->[$2] >= $3) ? 1 : 0 if ($2 != 2);
+    return ($months->[$month] >= $day) ? 1 : 0 if ($month != 2);
 
 # february in non-leap years
-    return ($months->[$2] >= $3) ? 1 : 0 if (($1 % 4 != 0) || ($1 % 100 == 0) && ($1 % 400 != 0));
+    return ($months->[$month] >= $day) ? 1 : 0 if (($1 % 4 != 0) || ($1 % 100 == 0) && ($1 % 400 != 0));
 
 # february in leap years
-    return ($3 >= 29) ? 1 : 0;
+    return ($day <= 29) ? 1 : 0;
 }
-
 
 =head1 Function: check_email
 
