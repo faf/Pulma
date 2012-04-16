@@ -136,7 +136,7 @@ elsif ($options->{'from'} eq 'logger') {
 else {
 
     print STDERR sprintf( "[error] Unknown data source '%s'!\n",
-			  $options->{'to'} );
+			  $options->{'from'} );
     exit(1);
 
 }
@@ -144,7 +144,7 @@ else {
 unless ($source) {
 
     print STDERR sprintf( "[error] Can't initialize data object '%s'\n",
-			  $options->{'to'} );
+			  $options->{'from'} );
     exit(1);
 
 }
