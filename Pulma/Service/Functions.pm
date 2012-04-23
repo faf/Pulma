@@ -637,7 +637,7 @@ sub idn_url {
 	}
 	my $params_flag = 0;
 	foreach (@misc2) {
-	    $_ = uri_escape($_);
+	    $_ = uri_escape_utf8($_);
 	}
 	$link = join('/', ($host, @misc2)) . ($params ? '?' . $params : '');
     }
