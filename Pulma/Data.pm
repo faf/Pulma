@@ -1627,7 +1627,7 @@ sub _store_entity_attributes {
 #	2. (boolean) flag to commit deletions (optional, useful only in
 #	   failsafe mode, default: true)
 # Returns
-#	1 on success or 1 on error
+#	1 on success or 0 on error
 
 sub _delete_entity_attributes {
     my $self = shift;
