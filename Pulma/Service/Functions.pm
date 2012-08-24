@@ -29,11 +29,12 @@ require Exporter;
 
 our @ISA = ('Exporter');
 our @EXPORT = qw( &calculate_password_hash &calculate_password_strength
-		  &check_color &check_date &check_email &check_login
-		  &check_number &check_sum &check_uri &escape &generate_entity_id
-		  &generate_rnd_string &idn_email &idn_url &make_http_date &pager
-		  &regexp_check &truncate_string &unescape &uri_escape
-		  &uri_escape_utf8 &uri_unescape &uri_unescape_utf8 );
+		  &check_color &check_date &check_decimal &check_email
+		  &check_login &check_number &check_sum &check_uri &escape
+		  &generate_entity_id &generate_rnd_string &idn_email
+		  &idn_url &make_http_date &pager &regexp_check
+		  &truncate_string &unescape &uri_escape &uri_escape_utf8
+		  &uri_unescape &uri_unescape_utf8 );
 
 use CGI::Fast qw(:standard unescapeHTML);
 use Digest::MD5 qw(md5_hex);
@@ -240,6 +241,51 @@ sub check_date {
     return ($day <= 29) ? 1 : 0;
 }
 
+=head1 Function: check_decimal
+
+=head2 Description
+
+Function to check incoming value to be a decimal number
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) value to check
+
+=item 2. (boolean) possibility of negative value (optional, default: false)
+
+=item 3. (boolean) possibility of using comma as a delimiter (optional,
+	 default: false)
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 if validation passed I<or> 0 - otherwise
+
+=back
+
+=cut
+
+sub check_decimal {
+    my $string = shift;
+    my $negative = shift || 0;
+    my $use_comma = shift || 0;
+    return 0 unless defined $string;
+    return 0 if (($string eq '') || ($string eq '.'));
+    return 0 if ($use_comma && ($string eq ','));
+    my $delims = $use_comma ? '(\.|,)' : '\.';
+    if ($negative) {
+	return ($string =~ /^-?[0-9]*($delims[0-9]*)?$/) ? 1 : 0;
+    }
+    else {
+	return ($string =~ /^[0-9]*($delims[0-9]*)?$/) ? 1 : 0;
+    }
+}
+
 =head1 Function: check_email
 
 =head2 Description
@@ -383,6 +429,9 @@ Function to check incoming value to be a valid money amount
 
 =item 2. (boolean) possibility of negative value (optional, default: false)
 
+=item 3. (boolean) possibility of using comma as a delimiter (optional,
+	 default: false)
+
 =back
 
 =head2 Returns
@@ -398,14 +447,22 @@ Function to check incoming value to be a valid money amount
 sub check_sum {
     my $string = shift;
     my $negative = shift || 0;
+    my $use_comma = shift || 0;
     return 0 unless defined $string;
     return 0 if (($string eq '') || ($string eq '.'));
-    $string = '0' . $string;
-    if ($negative) {
-	return ($string =~ /^-?[0-9]+(\.[0-9]{0,2})?$/) ? 1 : 0;
+    return 0 if ($use_comma && ($string eq ','));
+    my $delims = $use_comma ? '(\.|,)' : '\.';
+    if ($string =~ /^-/) {
+	$string =~ s/^-($delims)/-0$1/;
     }
     else {
-	return ($string =~ /^[0-9]+(\.[0-9]{0,2})?$/) ? 1 : 0;
+	$string =~ s/^($delims)/0$1/;
+    }
+    if ($negative) {
+	return ($string =~ /^-?[0-9]+($delims[0-9]{0,2})?$/) ? 1 : 0;
+    }
+    else {
+	return ($string =~ /^[0-9]+($delims[0-9]{0,2})?$/) ? 1 : 0;
     }
 }
 
@@ -627,7 +684,8 @@ sub idn_url {
 	$params .= join('?', @garbage);
     }
     if ($url =~ /[^A-Za-z0-9-]/) {
-	my ($host, @misc2) = split(/\//, $link);
+	my $trail_slash = ($url =~ /\/$/);
+	my ($host, @misc2) = split(/\//, $url);
 	_utf8_on($host);
 	eval {
 	    $host = domain_to_ascii($host, UseSTD3ASCIIRules => 0);
@@ -639,7 +697,8 @@ sub idn_url {
 	foreach (@misc2) {
 	    $_ = uri_escape_utf8($_);
 	}
-	$link = join('/', ($host, @misc2)) . ($params ? '?' . $params : '');
+	$link = join('/', ($host, @misc2)) . ($trail_slash ? '/' : '' ) .
+		($params ? '?' . $params : '');
     }
     else {
 	$link = $string;
