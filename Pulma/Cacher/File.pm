@@ -200,7 +200,7 @@ sub get {
 # Argument(s)
 #	none
 # Returns
-#	1 on success or 0 on error
+#	1 on success I<or> 0 on error
 
 sub _read_file {
     my $self = shift;
