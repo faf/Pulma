@@ -163,13 +163,13 @@ sub request {
 		    'path' => $path,
 		    'params' => $params,
 		    'cookies' => $cookies,
-		    'method' => request_method(),
-		    'remoteip' => remote_addr(),
-		    'useragent' => user_agent(),
+		    'method' => request_method() || '',
+		    'remoteip' => remote_addr() || '',
+		    'useragent' => user_agent() || '',
 		    'urlbase' => url(-base => 1) . $self->{'config'}->{'root'},
 		    'url' => url(-absolute => 1, -path => 1),
 		    'fullurl' => url(-absolute => 1, -query => 1, -path => 1),
-		    'query' => query_string()
+		    'query' => query_string() || ''
     };
 
     return $request;
