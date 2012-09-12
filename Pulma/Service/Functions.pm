@@ -884,6 +884,8 @@ sub regexp_check {
     my $value = shift;
     my $regexp = shift;
 
+    return (0, undef) unless defined $value;
+
     return -1 unless ($regexp =~ /^\/(.+)\/$/) && eval { '' =~ /$1/; 1 };
     my $template = $1;
     return ($value =~ /$template/) ?
