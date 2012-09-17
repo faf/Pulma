@@ -709,8 +709,10 @@ sub _disconnect {
 
     if (defined $self->{'connection'}) {
 
-	unless ($self->{'config'}->{'autocommit'}) {
-# rollback all uncommited changes
+	if ( !$self->{'config'}->{'autocommit'} &&
+	     $self->{'connection'}->ping() ) {
+
+# rollback all uncommited changes if connection wasn't lost
 	    log_it( 'debug',
 		    $self->{'name'} .
 			"::_disconnect: rolling back all changes made to DB" );
