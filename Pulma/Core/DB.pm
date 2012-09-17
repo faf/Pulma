@@ -577,6 +577,9 @@ sub _connect {
 
     }
 
+# connection failed, nothing to do here
+    return $result unless $result;
+
     log_it( 'debug',
 	    $self->{'name'} .
 		"::_connect: executing initial commands" );
