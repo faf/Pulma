@@ -756,6 +756,7 @@ sub _disconnect {
 
 	my $res = $self->{'connection'}->disconnect() ? 1 : 0;
 
+	delete $self->{'connection'};
 	$self->{'connection'} = undef;
 
 	return $res;
