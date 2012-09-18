@@ -223,9 +223,6 @@ sub check_date {
 
     return 0 unless ($string =~ /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/);
 
-# we started in 2011, while 2039 seems considerably far in future
-    return 0 if ($1 < 2011) || ($1 > 2039);
-
     my $months = [0,31,28,31,30,31,30,31,31,30,31,30,31];
 
     my $month = $2 + 0;
