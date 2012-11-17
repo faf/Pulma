@@ -1,0 +1,108 @@
+{
+
+# Mapper configuration ##########################################################
+    'map' => {
+	'file' => [ '/opt/pulma/mapping' ],
+	'root' => ''
+    },
+
+# Main data module configuration ################################################
+    'data' => {
+	'type' => 'mongodb',
+	'data' => {
+	    'username' => 'pulma',
+	    'password' => 'pulma',
+	    'host' => 'mongodb://localhost:27017',
+	    'db_name' => 'admin',
+	    'database' => 'data'
+	},
+	'cache' => 'memory' # Though memory cache won't be too effective
+    },
+
+# Authorization module configuration ############################################
+    'auth' => {
+	'type' => 'mongodb',
+	'data' => {
+	    'username' => 'pulma',
+	    'password' => 'pulma',
+	    'host' => 'mongodb://localhost:27017',
+	    'db_name' => 'admin',
+	    'database' => 'auth'
+	},
+	'cache' => 'memory'
+    },
+
+# Logger module configuration ###################################################
+
+    'logger' => {
+	'type' => 'mongodb',
+	'data' => {
+	    'username' => 'pulma',
+	    'password' => 'pulma',
+	    'host' => 'mongodb://localhost:27017',
+	    'db_name' => 'admin',
+	    'database' => 'logger'
+	},
+	'cache' => 'memory'
+    },
+
+########################## Pulma server configuration ##########################
+
+# System log configuration ######################################################
+    'syslog' => {
+# syslog options
+	'log_level' => -1, # use -1 (or any other negative number) to prevent
+			   # write to syslog
+	'syslog_facility' => 'daemon',
+	'syslog_ident' => 'pulma',
+	'syslog_logopt' => 'pid|cons|nofatal'
+    },
+
+# external logging. one can specify an anonymous function or name of an
+# external function in form of 'ModuleName/function/argument1/argument2/...'
+# for external function with arguments see documentation on Pulma::Service::Log
+# module for important details
+#     'external_log' => sub {},
+#     'external_log' => 'Module/function',
+
+# Templates engine configuration ################################################
+
+# location of system templates
+    'templates' => {
+# location of web pages templates
+        'path' => '/opt/pulma/usr/templates/',
+
+# path to cached web pages
+	'cache' => '/opt/pulma/var/cache/pulma/'
+    },
+
+# FastCGI server configuration ##################################################
+    'fcgi' => {
+# process manager settings
+        'proc_manager' => {
+                            n_processes => 3,
+                            start_delay => 0,
+                            die_timeout => 5,
+                            pm_title => 'pulma'
+        },
+
+# binding
+        'socket_path' => ':9000',
+
+# queue length
+        'listen_queue' => 5,
+
+# location of PID file
+        'pid_file' => '/opt/pulma/var/run/pulma/pulma.pid',
+
+# chroot directory
+#       'chroot' => '/opt/pulma/',
+
+# user and group to become after server start
+        'user' => '_nginx',
+        'group' => '_nginx',
+
+# id of the current pulma node
+	'nodeid' => 'pulma01'
+    }
+}
