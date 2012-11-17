@@ -5,7 +5,7 @@ Part of Pulma system
 
 Script to export data from data source into file
 
-Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+Copyright (C) 2011, 2012 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ use Pulma::Auth;
 use Pulma::Data;
 use Pulma::Logger;
 
+use Pulma::Service::Data::Operations;
 use Pulma::Service::Data::Parser;
 
 use Encode;
@@ -41,7 +42,7 @@ use Pod::Usage;
 =over
 
 =item export_data [--quiet] --config <Pulma configuration file>
---from <data|auth|logger> --to <file> --etype <entity type>
+--from <data|auth|logger> --to <file> [--normalize] --etype <entity type>
 [--etype <entity type2>, ...] [--filter <file1> [, --filter <file2>, ...]]
 
 =item I<or>
@@ -51,6 +52,10 @@ use Pod::Usage;
 =back
 
 When used in quiet mode only errors will be displayed
+
+normalize option should be set for entities' normalization (i.e. attributes'
+types conversion from string to numeric (integer or float) wherever it is
+possible)
 
 =cut
 
@@ -64,6 +69,7 @@ unless ( GetOptions( $options,
 		     'from=s',
 		     'to=s',
 		     'etype=s' => \@etypes,
+		     'normalize|n',
 		     'quiet|q',
 		     'filter|f=s' => \@files) ) {
 
@@ -238,7 +244,10 @@ foreach my $etype (@etypes) {
     print sprintf( "[info] Got %s entities of type '%s'\n",
 	     scalar(@$entities), $etype ) unless $options->{'quiet'};
 
-    map { push(@$data, $parser->encode($_)); } @$entities;
+    map {
+	$_ = normalize_entity($_) if $options->{'normalize'};
+	push(@$data, $parser->encode($_));
+    } @$entities;
 
 }
 
