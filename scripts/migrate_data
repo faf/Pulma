@@ -1,0 +1,288 @@
+#!/usr/bin/perl
+=head1 Pulma data migrator
+
+Part of Pulma system
+
+Script to migrate data from one data source to another. Could be useful
+when switching between different types of storages (i.e., for example
+from localdb to mongodb)
+
+However one can make migration using import_data and export_data scripts
+too
+
+Copyright (C) 2012 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+
+=cut
+
+use strict;
+use warnings;
+
+use lib qw( ../ );
+
+use Pulma::Auth;
+use Pulma::Data;
+use Pulma::Logger;
+
+use Pulma::Service::Data::Operations;
+
+use Encode;
+use Getopt::Long qw(:config no_ignore_case bundling no_auto_abbrev);
+use Pod::Usage;
+
+=head1 Usage
+
+=over
+
+=item migrate_data [--quiet] --config_from <Pulma configuration file>
+--from <data|auth|logger> --config_to <Pulma configuration file> --to
+<data|auth|logger> [--normalize] [--buffer <entities buffer>] --etype <etype1>
+[, --etype <etype2>, ...]
+
+=item I<or>
+
+=item migrate_data --help
+
+=back
+
+When used in quiet mode only errors will be displayed
+
+normalize option should be set for entities' normalization (i.e. attributes'
+types conversion from string to numeric (integer or float) wherever it is
+possible). very useful for mysql -> mongodb migration.
+
+default buffer size: 100 entities
+
+=cut
+
+# get options
+my $options = {};
+my @etypes;
+
+unless ( GetOptions( $options,
+		     'help|h',
+		     'config_from|cf=s',
+		     'from=s',
+		     'config_to|ct=s',
+		     'to=s',
+		     'buffer=i',
+		     'normalize|n',
+		     'quiet|q',
+		     'etype|f=s' => \@etypes) ) {
+
+    pod2usage(-exitval => 1, -verbose => 2);
+
+}
+
+if (exists($options->{'help'})) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !exists($options->{'config_to'}) || !exists($options->{'config_from'}) ||
+     !exists($options->{'to'}) || !exists($options->{'from'}) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+if ( !scalar(@etypes) ) {
+
+    pod2usage(-exitval => 0, -verbose => 2);
+
+}
+
+# check specified configuration files
+unless (-r $options->{'config_from'}) {
+
+    print STDERR
+	  sprintf( "[error] Configuration file %s for the data migration source not exist or not readable!\n",
+		   $options->{'config_from'} );
+    exit(1);
+
+}
+
+unless (-r $options->{'config_to'}) {
+
+    print STDERR
+	  sprintf( "[error] Configuration file %s for the data migration destination not exist or not readable!\n",
+		   $options->{'config_to'} );
+    exit(1);
+
+}
+
+# get configurations
+my $config_from = do($options->{'config_from'});
+if ($@) {
+
+    print STDERR sprintf("[error] Bad configuration format for the data migration source: %s\n", $@);
+    exit(1);
+
+}
+elsif (!defined $config_from) {
+
+    print STDERR sprintf("[error] Can't read configuration of the data migration source: %s\n", $!);
+    exit(1);
+
+}
+
+my $config_to = do($options->{'config_to'});
+if ($@) {
+
+    print STDERR sprintf("[error] Bad configuration format for the data migration destination: %s\n", $@);
+    exit(1);
+
+}
+elsif (!defined $config_to) {
+
+    print STDERR sprintf("[error] Can't read configuration of the data migration destination: %s\n", $!);
+    exit(1);
+}
+
+# set buffer
+my $limit = exists($options->{'buffer'}) ? $options->{'buffer'} : 100;
+
+# initialize data migration source and destination objects
+my $src;
+my $dest;
+my $null = {};
+if ($options->{'from'} eq 'data') {
+
+    $src = Pulma::Data->new($config_from->{'data'}, \$null);
+
+}
+elsif ($options->{'from'} eq 'auth') {
+
+    $src = Pulma::Auth->new($config_from->{'auth'}, \$null);
+
+
+}
+elsif ($options->{'from'} eq 'logger') {
+
+    $src = Pulma::Logger->new($config_from->{'logger'}, \$null);
+
+}
+else {
+
+    print STDERR sprintf( "[error] Unknown data migration source '%s'!\n",
+			  $options->{'from'} );
+    exit(1);
+
+}
+
+unless ($src) {
+
+    print STDERR sprintf( "[error] Can't initialize data migration source object '%s'\n",
+			  $options->{'from'} );
+    exit(1);
+
+}
+
+if ($options->{'to'} eq 'data') {
+
+    $dest = Pulma::Data->new($config_to->{'data'}, \$null);
+
+}
+elsif ($options->{'to'} eq 'auth') {
+
+    $dest = Pulma::Auth->new($config_to->{'auth'}, \$null);
+
+
+}
+elsif ($options->{'to'} eq 'logger') {
+
+    $dest = Pulma::Logger->new($config_to->{'logger'}, \$null);
+
+}
+else {
+
+    print STDERR sprintf( "[error] Unknown data migration destination '%s'!\n",
+			  $options->{'to'} );
+    exit(1);
+
+}
+
+unless ($dest) {
+
+    print STDERR sprintf( "[error] Can't initialize data migration destination object '%s'\n",
+			  $options->{'to'} );
+    exit(1);
+
+}
+
+# migrate data
+    foreach my $etype (@etypes) {
+
+	my $count = { 'success' => 0, 'fail' => 0 };
+
+	printf( "[info] Proceed with entities of type %s\n", $etype )
+						unless ($options->{'quiet'});
+
+	my $entities;
+	my $iteration = 0;
+	do {
+	    $entities = $limit ?
+			$src->get_entities( [],
+					    $etype,
+					    $limit,
+					    $limit * $iteration++ ) :
+			$src->get_entities( [],
+					    $etype );
+
+	    foreach my $entity (@$entities) {
+
+		$entity = normalize_entity($entity) if $options->{'normalize'};
+
+		my $id = $dest->create_entity($entity);
+		if ($id) {
+
+		    printf( "[info] Successfully migrated entity with id %s\n",
+			    $id ) unless ($options->{'quiet'});
+
+		    $count->{'success'}++;
+
+		}
+		else {
+
+		    print STDERR
+			sprintf ( "[error] Failed to migrate entity of type %s and with id %s\n",
+				  $etype, $entity->{'id'} );
+
+		    $count->{'fail'}++;
+
+		}
+
+	    }
+
+	}while ($limit && (scalar(@$entities) == $limit));
+
+	unless ($options->{'quiet'}) {
+
+	    unless ( $count->{'success'} || $count->{'fail'} ) {
+
+		printf( "[info] Entities of type %s not found\n", $etype );
+
+	    }
+	    else {
+
+		printf( "[info] Successfully migrate %s entities of type %s\n",
+			$count->{'success'}, $etype );
+		printf( "[info] Failed to migrate %s entities of type %s\n",
+			$count->{'fail'}, $etype );
+
+	    }
+	}
+
+    }
