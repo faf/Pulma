@@ -4,7 +4,7 @@ Part of Pulma system
 
 Class for operations with source of main data
 
-Copyright (C) 2011 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+Copyright (C) 2011, 2012 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ use warnings;
 
 use Pulma::Cacher::Data;
 use Pulma::Core::DB;
+use Pulma::Service::Data::Operations;
 use Pulma::Service::Functions;
 use Pulma::Service::Log;
 
@@ -74,8 +75,43 @@ sub new {
 	'name' => $name
     };
 
+# set up data cache object if need to
+    if ( exists($config->{'cache'}) && $config->{'cache'} eq 'memory' ) {
+
+	$self->{'cache'} = Pulma::Cacher::Data->new( \$cache, $self->{'name'} );
+
+    }
+
 # check for data source
-    unless ($config->{'type'} eq 'localdb') {
+    if ($config->{'type'} eq 'mongodb') {
+# data source: Mongo DB
+
+# try to initialize object
+	eval "require Pulma::Extensions::Data::MongoDB";
+	if ($@) {
+
+	    log_it( 'err',
+		    "Failed to require module Pulma::Extensions::Data::MongoDB for data management: %s",
+		    $@ );
+
+	    return undef;
+
+	}
+
+	$self->{'source'} = Pulma::Extensions::Data::MongoDB->new( $config->{'data'}, \$cache );
+
+	unless (defined $self->{'source'}) {
+
+	    log_it( 'err',
+		    "Failed to initialize MongoDB-based data management object",
+		    $@ );
+
+	    return undef ;
+
+	}
+
+    }
+    elsif ($config->{'type'} ne 'localdb') {
 
 	log_it( 'err',
 		$self->{'name'} . "::new: unknown backend type for object: %s",
@@ -85,8 +121,7 @@ sub new {
 
     }
     else {
-
-# data source: local DB
+# data source: "local" SQL DB
 
 	log_it('debug', $self->{'name'} . '::new: initializing DB object');
 
@@ -111,14 +146,8 @@ sub new {
 	}
 
 	log_it('debug', $self->{'name'} . '::new: DB object initialized');
-    }
 
-# set up data cache object if need to
-    if ( exists($config->{'cache'}) && $config->{'cache'} eq 'memory' ) {
-
-	$self->{'cache'} = Pulma::Cacher::Data->new( \$cache, $self->{'name'} );
-
-# store local DB connection into cache
+# store DB object into common built-in cache
 	$cache->{$self->{'name'} . '_db'} ||= $self->{'db'};
 
     }
@@ -183,39 +212,40 @@ sub get_entity_by_id {
 
     my $result = undef;
 
+# try to get entity from cache (if modtime specified)
+    if ( exists($self->{'cache'}) && (defined $modtime) ) {
+
+	log_it( 'debug',
+		$self->{'name'} .
+		    '::get_entity_by_id: look for actual entity with id %s in cache',
+		$id );
+
+	my $data = $self->{'cache'}->get( $id, $modtime );
+	if (defined $data) {
+
+	    log_it( 'debug',
+		    $self->{'name'} .
+			'::get_entity_by_id: actual entity with id %s found in cache',
+		    $id );
+
+	    return $data;
+
+	}
+	else {
+
+	    log_it( 'debug',
+		    $self->{'name'} .
+			'::get_entity_by_id: actual entity with id %s not found in cache',
+		    $id );
+
+	}
+
+    }
+
 # check type of data source
     if ($self->{'config'}->{'type'} eq 'localdb') {
 
 # data source: local DB
-
-# try to get entity from cache (if modtime specified)
-	if ( exists($self->{'cache'}) && (defined $modtime) ) {
-
-	    log_it( 'debug',
-		    $self->{'name'} .
-			'::get_entity_by_id: look for actual entity with id %s in cache',
-		    $id );
-
-	    my $data = $self->{'cache'}->get( $id, $modtime );
-	    if (defined $data) {
-
-		log_it( 'debug',
-			$self->{'name'} .
-			    '::get_entity_by_id: actual entity with id %s found in cache',
-			$id );
-
-		return $data;
-
-	    }
-	    else {
-
-		log_it( 'debug',
-			$self->{'name'} .
-			    '::get_entity_by_id: actual entity with id %s not found in cache',
-			$id );
-
-	    }
-	}
 
 # try to get entity (id and time of last modification) from database
 	my $entity = $self->{'db'}->execute( {'select' => 1, 'cache' => 1},
@@ -312,19 +342,47 @@ sub get_entity_by_id {
 
 	}
 
-# store entity in cache (if have to)
-	if ((defined $result) && (exists($self->{'cache'}))) {
+    }
+    elsif ($self->{'config'}->{'type'} eq 'mongodb') {
+
+# data source: MongoDB
+
+	my $entity = $self->{'source'}->get_entity($id, $etype);
+
+	if (exists($entity->{'error'})) {
+
+	    log_it( 'err',
+		    $self->{'name'} .
+			'::get_entity_by_id: got error when tried to get entity of type %s with id %s: %s',
+		    $etype, $id, $entity->{'error'} );
+
+	}
+	elsif (!scalar(@{$entity->{'data'}})) {
 
 	    log_it( 'debug',
 		    $self->{'name'} .
-			'::get_entity_by_id: stored entity with id %s in cache',
+			'::get_entity_by_id: entity with id %s not found',
 		    $id );
 
-	    $self->{'cache'}->put($id, $result);
+	}
+	elsif (scalar(@{$entity->{'data'}}) != 1) {
+
+	    log_it( 'err',
+		    $self->{'name'} .
+			'::get_entity_by_id: something weird, got more than one entity with id %s',
+		    $id );
 
 	}
+	else {
 
-	return $result;
+	    log_it( 'debug',
+		    $self->{'name'} .
+			'::get_entity_by_id: successfully got entity with %s',
+		    $id );
+
+	    $result = $entity->{'data'}->[0];
+
+	}
 
     }
     else {
@@ -334,9 +392,21 @@ sub get_entity_by_id {
 		    "::get_entity_by_id: unknown backend type %s, can't obtain data!",
 		$self->{'config'}->{'type'} );
 
-	return $result;
+    }
+
+# store entity in cache (if have to)
+    if ((defined $result) && (exists($self->{'cache'}))) {
+
+	log_it( 'debug',
+		$self->{'name'} .
+		    '::get_entity_by_id: stored entity with id %s in cache',
+		$id );
+
+	$self->{'cache'}->put($id, $result);
 
     }
+
+    return $result;
 }
 
 =head1 Method: get_entities_count
@@ -400,9 +470,10 @@ the one specified in sort condition. If more accurate (but more slow
 and resource-hungry) sorting needed, one should use B<sort_entities> method
 instead.
 
-B<IMPORTANT!> Note that sorting conditions overrides each other (even in
-different filters). So there is no reasons to use more than one such condition
-for filters. Use B<sort_entities> method instead.
+B<IMPORTANT!> Note that sorting conditions (at least for localdb backend)
+overrides each other (even in different filters). So there is no reasons
+to use more than one such condition for filters. Use B<sort_entities> method
+instead.
 
 =cut
 
@@ -416,6 +487,11 @@ sub get_entities_count {
 	my $entities = $self->_get_entities_from_localdb($filters, $etype);
 
 	return scalar(@$entities) || 0;
+
+    }
+    elsif ($self->{'config'}->{'type'} eq 'mongodb') {
+
+	return $self->{'source'}->get_entities_count($filters, $etype);
 
     }
     else {
@@ -468,7 +544,10 @@ sub get_entities {
     my $limit = shift || 0;
     my $offset = shift || 0;
 
+# check type of data source
     if ($self->{'config'}->{'type'} eq 'localdb') {
+
+# data source: local DB
 
 	my $entities = $self->_get_entities_from_localdb( $filters,
 							  $etype,
@@ -483,6 +562,16 @@ sub get_entities {
 	}
 
 	return $result;
+
+    }
+    elsif ($self->{'config'}->{'type'} eq 'mongodb') {
+
+# data source: MongoDB
+
+	return $self->{'source'}->get_entities( $filters,
+						$etype,
+						$limit,
+						$offset );
 
     }
     else {
@@ -559,7 +648,7 @@ sub sort_entities {
     }
 
     @$entities = sort {
-	_compare_attributes($a, $b, $name, $order)
+	compare_attributes($a, $b, $name, $order)
     } @$entities;
 
     return $entities;
@@ -593,42 +682,33 @@ sub create_entity {
     my $self = shift;
     my $entity = shift;
 
-# check type of data source
-    if ($self->{'config'}->{'type'} ne 'localdb') {
+# check entity type
+    unless (exists($entity->{'etype'})) {
 
-	log_it( 'warning',
+	log_it( 'err',
 		$self->{'name'} .
-		    "::create_entity: unknown backend type %s, can't update data!",
-		$self->{'config'}->{'type'} );
+		    '::create_entity: attempt to create entity without type!' );
 
 	return 0;
 
     }
-    else {
-# data source: local DB
-
-# check entity type
-	unless (exists($entity->{'etype'})) {
-
-	    log_it( 'err',
-		    $self->{'name'} .
-			'::create_entity: attempt to create entity without type!' );
-
-	    return 0;
-
-	}
 
 # set entity id (if need to)
-	$entity->{'id'} ||= generate_entity_id( $entity->{'etype'},
-						$self->{'config'}->{'nodeid'} );
+    $entity->{'id'} ||= generate_entity_id( $entity->{'etype'},
+					    $self->{'config'}->{'nodeid'} );
 
 # set entity last modification time
-	$entity->{'modtime'} ||= time;
+    $entity->{'modtime'} ||= time;
 
-	log_it( 'debug',
-		$self->{'name'} .
-		    '::create_entity: creating entity with id %s and of type %s',
-		$entity->{'id'}, $entity->{'etype'} );
+    log_it( 'debug',
+	    $self->{'name'} .
+		'::create_entity: creating entity with id %s and of type %s',
+	    $entity->{'id'}, $entity->{'etype'} );
+
+# check type of data source
+    if ($self->{'config'}->{'type'} eq 'localdb') {
+
+# data source: local DB
 
 # check for entity with given id (there should be no duplicates)
 	my $check = $self->{'db'}->execute( {'select' => 1, 'cache' => 1},
@@ -729,22 +809,41 @@ sub create_entity {
 			"::create_entity: attributes for entity with id %s and of type %s successfully stored",
 		    $entity->{'id'}, $entity->{'etype'} );
 
-# put entity in cache (if need to)
-	    if (exists($self->{'cache'})) {
 
-		log_it( 'debug',
-			$self->{'name'} .
-			    '::create_entity: store entity with id %s in cache',
-			$entity->{'id'} );
-
-		$self->{'cache'}->put($entity->{'id'}, $entity);
-
-	    }
-
-	    return $entity->{'id'};
 
 	}
     }
+    elsif ($self->{'config'}->{'type'} eq 'mongodb') {
+
+# data source: MongoDB
+
+	return 0 unless $self->{'source'}->create_entity($entity);
+
+    }
+    else {
+
+	log_it( 'warning',
+		$self->{'name'} .
+		    "::create_entity: unknown backend type %s, can't update data!",
+		$self->{'config'}->{'type'} );
+
+	return 0;
+    }
+
+# put entity in cache (if need to)
+    if (exists($self->{'cache'})) {
+
+	log_it( 'debug',
+		$self->{'name'} .
+		    '::create_entity: store entity with id %s in cache',
+		$entity->{'id'} );
+
+	$self->{'cache'}->put($entity->{'id'}, $entity);
+
+    }
+
+    return $entity->{'id'};
+
 }
 
 =head1 Method: update_entity
@@ -776,17 +875,8 @@ sub update_entity {
     my $entity = shift;
 
 # check type of data source
-    if ($self->{'config'}->{'type'} ne 'localdb') {
+    if ($self->{'config'}->{'type'} eq 'localdb') {
 
-	log_it( 'warning',
-		$self->{'name'} .
-		    "::update_entity: unknown backend type %s, can't update data!",
-		$self->{'config'}->{'type'} );
-
-	return 0;
-
-    }
-    else {
 # data source: local DB
 
 # check entity id
@@ -951,22 +1041,40 @@ sub update_entity {
 			"::update_entity: attributes for entity with id %s and of type %s successfully stored",
 		    $entity->{'id'}, $entity->{'etype'} );
 
-# put entity in cache (if need to)
-	    if (exists($self->{'cache'})) {
 
-		log_it( 'debug',
-			$self->{'name'} .
-			    '::update_entity: store entity with id %s in cache',
-			$entity->{'id'} );
-
-		$self->{'cache'}->put($entity->{'id'}, $entity);
-
-	    }
-
-	    return 1;
 
 	}
     }
+    elsif ($self->{'config'}->{'type'} eq 'mongodb') {
+
+# data source: MongoDB
+	return 0 unless $self->{'source'}->update_entity($entity);
+
+    }
+    else {
+
+	log_it( 'warning',
+		$self->{'name'} .
+		    "::update_entity: unknown backend type %s, can't update data!",
+		$self->{'config'}->{'type'} );
+
+	return 0;
+
+    }
+
+# put entity in cache (if need to)
+    if (exists($self->{'cache'})) {
+
+	log_it( 'debug',
+		$self->{'name'} .
+		    '::update_entity: store entity with id %s in cache',
+		$entity->{'id'} );
+
+	$self->{'cache'}->put($entity->{'id'}, $entity);
+
+    }
+
+    return 1;
 }
 
 =head1 Method: delete_entity
@@ -998,17 +1106,7 @@ sub delete_entity {
     my $entity = shift;
 
 # check type of data source
-    if ($self->{'config'}->{'type'} ne 'localdb') {
-
-	log_it( 'warning',
-		$self->{'name'} .
-		    "::delete_entity: unknown backend type %s, can't delete data!",
-		$self->{'config'}->{'type'} );
-
-	return 0;
-
-    }
-    else {
+    if ($self->{'config'}->{'type'} eq 'localdb') {
 
 # data source: local DB
 
@@ -1091,21 +1189,37 @@ sub delete_entity {
 
 	}
 
-# remove entity from cache (if need to)
-	if (exists($self->{'cache'})) {
+    }
+    elsif ($self->{'config'}->{'type'} eq 'localdb') {
 
-	    log_it( 'debug',
-		    $self->{'name'} .
-			'::delete_entity: deleting entity with id %s from cache',
-		    $entity->{'id'} );
-
-	    $self->{'cache'}->del($entity->{'id'});
-
-	}
-
-	return 1;
+# data source: MongoDB
+	return 0 unless $self->{'source'}->delete_entity($entity);
 
     }
+    else {
+
+	log_it( 'warning',
+		$self->{'name'} .
+		    "::delete_entity: unknown backend type %s, can't delete data!",
+		$self->{'config'}->{'type'} );
+
+	return 0;
+
+    }
+
+# remove entity from cache (if need to)
+    if (exists($self->{'cache'})) {
+
+	log_it( 'debug',
+		$self->{'name'} .
+		    '::delete_entity: deleting entity with id %s from cache',
+		$entity->{'id'} );
+
+	$self->{'cache'}->del($entity->{'id'});
+
+    }
+
+    return 1;
 }
 
 =head1 Method: delete_entities
@@ -1150,7 +1264,10 @@ sub delete_entities {
 
     my $result = { 'deleted' => 0, 'failed' => 0 };
 
+# check type of data source
     if ($self->{'config'}->{'type'} eq 'localdb') {
+
+# data source: local DB
 
 	my $entities = $self->_get_entities_from_localdb($filters, $etype);
 	
@@ -1165,6 +1282,30 @@ sub delete_entities {
 	    }
 	    else {
 		$result->{'failed'}++;
+	    }
+
+	}
+
+	return $result;
+
+    }
+    elsif ($self->{'config'}->{'type'} eq 'mongodb') {
+
+# data source: MongoDB
+
+	my $result = $self->{'source'}->delete_entities($filters, $etype);
+
+# remove entities from cache (if need to)
+	if ( exists($self->{'cache'}) && scalar(@{$result->{'deleted_ids'}}) ) {
+
+	    foreach my $id (@{$result->{'deleted_ids'}}) {
+
+		log_it( 'debug',
+			$self->{'name'} .
+			    '::delete_entities: deleting entity with id %s from cache',
+			$id );
+
+		$self->{'cache'}->del($id);
 	    }
 
 	}
@@ -1248,7 +1389,7 @@ sub _get_entities_from_localdb {
 		if ( (ref($condition) ne 'HASH') ||
 		     !exists($condition->{'name'}) ||
 		     ( !exists($condition->{'value'}) ||
-		       !$self->_check_filter_operation($condition->{'op'}) ) &&
+		       !check_filter_operation($condition->{'op'}) ) &&
 		     !exists($condition->{'sort'}) ) {
 
 		    log_it( 'err',
@@ -1686,97 +1827,6 @@ sub _delete_entity_attributes {
     }
 
     return 1;
-}
-
-# Method: _check_filter_operation
-# Description
-#	Method to validate an operation used in filter
-# Argument(s)
-#	1. (string) operation
-# Returns
-#	true if operation is valid or false on error
-
-sub _check_filter_operation {
-    my $self = shift;
-    my $operation = shift;
-
-    return ( ($operation eq '=') ||
-	     ($operation eq '<') ||
-	     ($operation eq '>') ||
-	     ($operation eq '<=') ||
-	     ($operation eq '>=') ||
-	     ($operation eq '<>') ||
-	     ($operation eq '~' ) ||
-	     ($operation eq '~~' ) );
-}
-
-# Function: _compare_attributes
-# Description
-#	Compare given attributes of two entities in order to sort them
-# Argument(s)
-#	1. (link to hash) first entity
-#	2. (link to hash) second entity
-#	3. (string) attribute name
-#	4. (string) sort mode (optional, default: ascendant sort with symbolic
-#		    comparsion)
-# Returns
-#	1 if first entity should stand before second entity, 0 if they are equal,
-#	or -1 if second entity should stand before first entity
-
-sub _compare_attributes {
-    my $first = shift;
-    my $second = shift;
-    my $name = shift;
-    my $order = shift;
-
-# (in case of multiple values compare only first ones)
-    my @attrsa;
-    my @attrsb;
-
-# initialize entities' attributes to sort by if they're not defined
-    if ( !defined($first->{'attributes'}->{$name}) ) {
-	$first->{'attributes'}->{$name} = [];
-    }
-    if ( !defined($second->{'attributes'}->{$name}) ) {
-	$second->{'attributes'}->{$name} = [];
-    }
-
-# ascendant sort with symbolic comparsion
-    if ($order eq 'asc') {
-
-	@attrsa = sort { $a cmp $b } (@{$first->{'attributes'}->{$name}});
-	@attrsb = sort { $a cmp $b } (@{$second->{'attributes'}->{$name}});
-
-	return ($attrsa[0] || '') cmp ($attrsb[0] || '');
-
-    }
-# descendant sort with symbolic comparsion
-    elsif ($order eq 'desc') {
-
-	@attrsa = sort { $b cmp $a } (@{$first->{'attributes'}->{$name}});
-	@attrsb = sort { $b cmp $a } (@{$second->{'attributes'}->{$name}});
-
-	return ($attrsb[0] || '') cmp ($attrsa[0] || '');
-
-    }
-# ascendant sort with numeric comparsion
-    elsif ($order eq 'nasc') {
-	@attrsa = sort { $a <=> $b } (@{$first->{'attributes'}->{$name}});
-	@attrsb = sort { $a <=> $b } (@{$second->{'attributes'}->{$name}});
-
-	return (0 + ($attrsa[0] || 0)) <=> (0 + ($attrsb[0] || 0));
-
-    }
-# descendant sort with numeric comparsion
-    elsif ($order eq 'ndesc') {
-
-	@attrsa = sort { $b <=> $a } (@{$first->{'attributes'}->{$name}});
-	@attrsb = sort { $b <=> $a } (@{$second->{'attributes'}->{$name}});
-
-	return (0 + ($attrsb[0] || 0)) <=> (0 + ($attrsa[0] || 0));
-
-    }
-    return 0;
 }
 
 1;
