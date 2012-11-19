@@ -1190,7 +1190,7 @@ sub delete_entity {
 	}
 
     }
-    elsif ($self->{'config'}->{'type'} eq 'localdb') {
+    elsif ($self->{'config'}->{'type'} eq 'mongodb') {
 
 # data source: MongoDB
 	return 0 unless $self->{'source'}->delete_entity($entity);
