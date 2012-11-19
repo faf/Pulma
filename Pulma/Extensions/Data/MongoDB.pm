@@ -28,6 +28,9 @@ use warnings;
 use Data::Structure::Util qw( unbless );
 use MongoDB;
 
+# set unicode flag for all data from MongoDB
+$MongoDB::BSON::utf8_flag_on = 1;
+
 use Pulma::Service::Data::Operations;
 use Pulma::Service::Log;
 
@@ -97,7 +100,6 @@ sub new {
     return bless($self, $package);
 }
 
-
 =head1 Method: get_entity
 
 =head2 Description
@@ -112,8 +114,8 @@ Method to get entity by id and entity's type
 
 =item 2. (string) entity type
 
-=item 3. (boolean) flag to save internal id field (i.e. '_id') (optional,
-default: false)
+=item 3. (boolean) flag to return data object instead of data
+structure (optional, default: false)
 
 =back
 
@@ -121,13 +123,13 @@ default: false)
 
 =over
 
-=item (link to hash) result hash
+=item (link to hash) resulting hash
 
 =back
 
-=head2 Structure of result hash
+=head2 Structure of resulting hash
 
-Structure of result hash mimics the similar structure of result hash in class
+Structure of resulting hash mimics the similar structure of resulting hash in class
 for working with local DB data source. See Pulma::Core::DB for details
 
 =cut
@@ -136,8 +138,9 @@ sub get_entity {
     my $self = shift;
     my $id = shift;
     my $etype = shift;
-    my $save_id = shift || 0;
+    my $return_object = shift || 0;
 
+# try to get entity from MongoDB
     my $result;
     eval {
 	@$result = $self->{'db'}->get_database($self->{'config'}->{'database'})->get_collection('entities')->find( { 'id' => $id,
@@ -147,19 +150,64 @@ sub get_entity {
 	return { 'error' => $@ };
     }
     else {
-# untie resulting hash from objects
-	foreach (@$result) {
-	    unbless $_;
-# remove internal '_id' field if need to
-	    delete $_->{'_id'} unless $save_id;
+
+	log_it( 'debug',
+		$self->{'name'} .
+		    '::get_entity: successfully got entities (%s) with id %s and of type %s',
+		scalar(@$result), $id, $etype );
+
+# unbless resulting hash from objects and remove internal '_id' field if need to
+	unless ($return_object) {
+
+	    foreach (@$result) {
+		unbless $_;
+		delete $_->{'_id'};
+	    }
+
+# all data that comes from MongoDB is in Unicode (actually unicode flag should
+# already be set by MongoDB, but we set it once again just in case...
+	    $result = set_unicode_flag($result, 1);
+
 	}
-# all data that comes from MongoDB is Unicode
-	$result = set_unicode_flag($result, 1);
+
 	return { 'data' => $result };
     }
 }
 
-# to document
+=head1 Method: get_entities
+
+=head2 Description
+
+Method to get entities of a given type and (maybe) filtered by some criteria
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to array) filters to choose entities
+
+=item 2. (string) entities' type
+
+=item 3. (integer) entities limit (optional, default: no limits)
+
+=item 4. (integer) offset (optional, default: no offset)
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (array) entities (as an array of hashes, each one stands for an entity)
+
+=back
+
+=head2 Filters structure
+
+See Pulma::Data for details
+
+=cut
+
 sub get_entities {
     my $self = shift;
     my $filters = shift;
@@ -167,6 +215,7 @@ sub get_entities {
     my $limit = shift;
     my $offset = shift;
 
+# construct filters for query to MongoDB based upon incoming filters
     $filters = $self->_construct_filters($filters, $etype);
 
     unless (defined $filters) {
@@ -180,12 +229,19 @@ sub get_entities {
 
     }
 
+    log_it( 'debug',
+	    $self->{'name'} .
+		'::get_entities: successfully constructed filters for getting entities of type %s',
+	    $etype );
+
+# try to get entities
     my $result;
     eval {
 	my $cursor = $self->{'db'}->get_database($self->{'config'}->{'database'})->get_collection('entities')->find( $filters->{'filters'} );
 	foreach my $sorting (@{$filters->{'sorting'}}) {
 	    $cursor = $cursor->sort( $sorting );
 	}
+
 	if (defined($limit)) {
 	    $cursor = $cursor->limit($limit);
 	}
@@ -204,19 +260,56 @@ sub get_entities {
 
     }
     else {
-# all data that comes from MongoDB is Unicode
+
+	log_it( 'debug',
+		$self->{'name'} .
+		    '::get_entities: successfully got %s entities of type %s',
+		scalar(@$result), $etype );
+
+# unbless resulting hashes from objects
 	foreach (@$result) {
 	    unbless $_;
 	    delete $_->{'_id'};
 	}
+
+# all data that comes from MongoDB is in Unicode
 	$result = set_unicode_flag($result, 1);
+
 	return $result;
+
     }
-
-
 }
 
-# to document
+=head1 Method: get_entities_count
+
+=head2 Description
+
+Method to count entities of a given type and (maybe) filtered by some criteria
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to array) filters to choose entities
+
+=item 2. (string) entities' type
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (integer) number of entities
+
+=back
+
+=head2 Filters structure
+
+See Pulma::Data for details
+
+=cut
+
 sub get_entities_count {
     my $self = shift;
     my $filters = shift;
@@ -224,6 +317,7 @@ sub get_entities_count {
 
     my $result = 0;
 
+# construct filters for query to MongoDB based upon incoming filters
     $filters = $self->_construct_filters($filters, $etype);
 
     unless (defined $filters) {
@@ -237,6 +331,12 @@ sub get_entities_count {
 
     }
 
+    log_it( 'debug',
+	    $self->{'name'} .
+		'::get_entities_count: successfully constructed filters for counting entities of type %s',
+	    $etype );
+
+# try to count entities
     eval {
 	$result = $self->{'db'}->get_database($self->{'config'}->{'database'})->get_collection('entities')->count( $filters->{'filters'} );
     };
@@ -250,10 +350,38 @@ sub get_entities_count {
 
     }
 
+    log_it( 'debug',
+	    $self->{'name'} .
+		'::get_entities_count: successfully counted entities of type %s, got %s',
+	    $etype, $result );
+
     return $result;
 }
 
-# to document
+=head1 Method: create_entity
+
+=head2 Description
+
+Method to create new entity
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to hash) entity
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (integer) entity id on success I<or> 0 on error
+
+=back
+
+=cut
+
 sub create_entity {
     my $self = shift;
     my $entity = shift;
@@ -274,13 +402,19 @@ sub create_entity {
 
 	log_it( 'err',
 		$self->{'name'} .
-		    "::create_entity: can't create entity with id %s and of type %s: there is already entity with the same id! Got %s entity(ies).",
+		    "::create_entity: can't create entity with id %s and of type %s: there is already entity with the same id! Got %s entity(ies)",
 		$entity->{'id'}, $entity->{'etype'}, scalar(@{$temp->{'data'}}) );
 
 	return 0;
 
     }
 
+    log_it( 'debug',
+	    $self->{'name'} .
+		'::create_entity: entity with id %s and of type %s not found in database',
+	    $entity->{'id'}, $entity->{'etype'} );
+
+# try to create entity
     my $object_id;
     eval {
 # prevent errors on insert of binary data or strings containing wide characters
@@ -310,22 +444,50 @@ sub create_entity {
     }
     else {
 
+	log_it( 'debug',
+		$self->{'name'} .
+		    '::create_entity: successfully created entity with id %s and of type %s',
+		$entity->{'id'}, $entity->{'etype'} );
+
 	return $entity->{'id'};
 
     }
 }
 
-# to document
+=head1 Method: delete_entity
+
+=head2 Description
+
+Method to delete entity
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to hash) entity
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (integer) 1 on success I<or> 0 on error
+
+=back
+
+=cut
+
 sub delete_entity {
     my $self = shift;
     my $entity = shift;
 
-
+# check entity id and type
     unless (exists($entity->{'id'})) {
 
 	log_it( 'err',
 		$self->{'name'} .
-		    '::delete_entity: attempt to delete entity without id!' );
+		    '::delete_entity: attempt to delete entity without id' );
 
 	return 0;
 
@@ -335,14 +497,14 @@ sub delete_entity {
 
 	log_it( 'err',
 		$self->{'name'} .
-		    '::delete_entity: attempt to delete entity without type!' );
+		    '::delete_entity: attempt to delete entity without type' );
 
 	return 0;
 
     }
 
-    my $result = 0;
 # try to delete entity
+    my $result = 0;
     eval {
 	$result = $self->{'db'}->get_database($self->{'config'}->{'database'})->get_collection('entities')->remove( { 'id' => $entity->{'id'},
 														      'etype' => $entity->{'etype'} },
@@ -359,11 +521,50 @@ sub delete_entity {
 
     }
 
-    return 1;
+    log_it( 'debug',
+	    $self->{'name'} .
+		'::delete_entity: successfully deleted entity with id %s and of type %s',
+	    $entity->{'id'}, $entity->{'etype'} );
 
+    return 1;
 }
 
-# to document
+=head1 Method: delete_entities
+
+=head2 Description
+
+Method to delete entities of a given type filtered by some criteria
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to array) filters to choose entities
+
+=item 2. (string) entities' type
+
+=back
+
+=head2 Returns
+
+=over
+
+=item (link to hash) resulting hash
+
+=back
+
+=head2 Structure of resulting hash
+
+{
+    'deleted'	=> <number of successfully deleted entities>,
+
+    'deleted_ids' => [ array of ids of successfully deleted entities ],
+
+    'failed'	=> <number of entities failed to delete>
+}
+
+=cut
+
 sub delete_entities {
     my $self = shift;
     my $filters = shift;
@@ -392,10 +593,32 @@ sub delete_entities {
     }
 
     return $result;
-
 }
 
-# to document
+=head1 Method: update_entity
+
+=head2 Description
+
+Method to update an existed entity
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to hash) entity
+
+=back
+
+=head2 Results
+
+=over
+
+=item 1 on success I<or> 0 on error
+
+=back
+
+=cut
+
 sub update_entity {
     my $self = shift;
     my $entity = shift;
@@ -427,30 +650,30 @@ sub update_entity {
 		'::update_entity: updating entity with id %s and of type %s',
 	    $entity->{'id'}, $entity->{'etype'} );
 
-# check entity's existance (by given id and type) and get it's internal id
-    my $check = $self->get_entity($entity->{'id'}, $entity->{'etype'}, 1);
+# get entity as an object
+    my $entity_object = $self->get_entity($entity->{'id'}, $entity->{'etype'}, 1);
 
-    if (exists($check->{'error'})) {
+    if (exists($entity_object->{'error'})) {
 
 	log_it( 'err',
 		$self->{'name'} .
 		    "::update_entity: can't check entity with id %s and of type %s for existance: %s",
-		$entity->{'id'}, $entity->{'etype'}, $check->{'error'} );
+		$entity->{'id'}, $entity->{'etype'}, $entity_object->{'error'} );
 
 	return 0;
 
     }
-    elsif (scalar(@{$check->{'data'}}) != 1) {
+    elsif (scalar(@{$entity_object->{'data'}}) != 1) {
 
 	log_it( 'err',
 		$self->{'name'} .
 		    "::update_entity: failed to update entity with id %s and of type %s for existance: there are several (%s) entities with the same ids!",
-		$entity->{'id'}, $entity->{'etype'}, scalar(@{$check->{'data'}}) );
+		$entity->{'id'}, $entity->{'etype'}, scalar(@{$entity_object->{'data'}}) );
 
 	return 0;
 
     }
-    elsif (!exists($check->{'data'}->[0]->{'_id'})) {
+    elsif (!exists($entity_object->{'data'}->[0]->{'_id'})) {
 
 	log_it( 'err',
 		$self->{'name'} .
@@ -464,20 +687,25 @@ sub update_entity {
 
 	log_it( 'debug',
 		$self->{'name'} .
-		    "::update_entity: entity with id %s and of type %s exists and unique, successfully got it's internal id",
+		    "::update_entity: entity with id %s and of type %s exists and unique, successfully got it as an object",
 		$entity->{'id'}, $entity->{'etype'} );
 
     }
 
-# prepare entity for update
-    $entity->{'_id'} = $check->{'_id'};
-    $entity->{'modtime'} = time;
+# prepare entity object for update
+    my $updated_entity = $entity_object->{'data'}->[0];
+    $updated_entity->{'modtime'} = time;
+    $updated_entity->{'attributes'} = $entity->{'attributes'};
 
 # try to update entity
     my $result = 0;
     eval {
-	$result = $self->{'db'}->get_database($self->{'config'}->{'database'})->get_collection('entities')->save( $entity,
+# prevent errors on insert of binary data or strings containing wide characters
+	$updated_entity = set_unicode_flag($updated_entity, 0);
+	$result = $self->{'db'}->get_database($self->{'config'}->{'database'})->get_collection('entities')->save( $updated_entity,
 														  { 'safe' => 1 } );
+# return to native Unicoded data representation
+	$updated_entity = set_unicode_flag($updated_entity, 1);
     };
     if ($@) {
 
@@ -489,20 +717,37 @@ sub update_entity {
 
     }
 
-    return 1;
+    log_it( 'debug',
+	    $self->{'name'} .
+		"::update_entity: successfully updated entity with id %s and of type %s",
+	    $entity->{'id'}, $entity->{'etype'} );
 
+    return 1;
 }
 
 ############################## Private methods ##################################
 
+# Method: _construct_filters
+# Description
+#	Construct filters for query to MongoDB based upon incoming standard
+#	Pulma filters
+# Argument(s)
+#	1. (link to array) filters to choose (and (maybe) sort) entities
+#	2. (string) entities' type
+# Returns
+#	(link to hash) resulting hash
+# Structure of the resulting hash:
+#	{
+#	    'filters' => { hash: argument for MongoDB's methods find and count },
+#	    'sorting' => [ array of hashes: arguments for MongoDB's method sort ]
+#	}
 
-# to document
 sub _construct_filters {
     my $self = shift;
     my $filters = shift;
     my $etype = shift;
 
-# validate structure of filters (should be array)
+# validate structure of incoming filters (should be array)
     unless (ref($filters) eq 'ARRAY') {
 
 	log_it( 'err',
@@ -517,14 +762,18 @@ sub _construct_filters {
 # check whether there are at least one actual filter
     unless (scalar(@$filters)) {
 
-	return { 'filter' => { 'etype' => $etype }, 'sorting' => [] };
+# there are no actual filters, set the only one filter by entity type
+
+	return { 'filters' => { 'etype' => $etype }, 'sorting' => [] };
 
     }
 
+# construct filters for query to MongoDB from all incoming filters
     my $result = [];
     my $sorting = [];
     foreach my $filter (@$filters) {
 
+# validate structure of incoming filter (should be array)
 	unless (ref($filter) eq 'ARRAY') {
 
 	    log_it( 'err',
@@ -579,11 +828,14 @@ sub _construct_filters {
 
 		    if ($condition->{'op'} eq '=') {
 
+# simple equality condition
 			push ( @$temp,
 			       { 'attributes.' . $condition->{'name'} => $value } );
 
 		    }
 		    else {
+
+# more complicated conditions
 			my $temp2 = { { '>=' => '$gte',
 					'<=' => '$lte',
 					'>' => '$gt',
@@ -591,6 +843,8 @@ sub _construct_filters {
 					'<>' => '$ne',
 					'~' => '$regex',
 					'~~' => '$regex' }->{$condition->{'op'}} => $value };
+
+# set case-insensitive regular expression mode for '~~' operation
 			if ($condition->{'op'} eq '~~') {
 			    $temp2->{'$options'} = 'i';
 			}
@@ -602,7 +856,8 @@ sub _construct_filters {
 
 		}
 		else {
-# sorting
+
+# set sorting mode for sorting operation
 		    $sort->{'attributes.' . $condition->{'name'}} = ($condition->{'sort'} eq 'desc') ||
 								   ($condition->{'sort'} eq 'ndesc') ?
 								   -1 :
@@ -614,6 +869,7 @@ sub _construct_filters {
 	}
 
 	if (scalar(@$temp) > 1) {
+# more than one operation specified for the filter - use logical 'OR' operator
 	    push(@$result, { '$or' => $temp });
 	}
 	elsif (scalar(@$temp)) {
@@ -626,9 +882,10 @@ sub _construct_filters {
 
     }
 
+# set additional filter by entity type
     push ( @$result, { 'etype' => $etype } );
 
-    return { 'filters' => { '$and' => $result },
+    return { 'filters' => { '$and' => normalize_structure($result) },
 	     'sorting' => $sorting };
 
 }

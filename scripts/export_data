@@ -245,7 +245,7 @@ foreach my $etype (@etypes) {
 	     scalar(@$entities), $etype ) unless $options->{'quiet'};
 
     map {
-	$_ = normalize_entity($_) if $options->{'normalize'};
+	$_ = normalize_structure($_) if $options->{'normalize'};
 	push(@$data, $parser->encode($_));
     } @$entities;
 

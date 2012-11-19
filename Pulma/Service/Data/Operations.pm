@@ -33,7 +33,7 @@ require Exporter;
 
 our @ISA = ('Exporter');
 our @EXPORT = qw( &check_filter_operation &compare_attributes
-		  &normalize_entity &set_unicode_flag );
+		  &normalize_structure &set_unicode_flag );
 
 # Function: check_filter_operation
 # Description
@@ -125,43 +125,40 @@ sub compare_attributes {
     return 0;
 }
 
-# Function: normalize_entity
+# Function: normalize_structure
 # Description
-#	Make numeric attributes of the entity actually numeric (change their
+#	Make numeric attributes of the structure actually numeric (change their
 #	types from string to integer / float
 # Argument(s)
-#	1. (link to hash) entity structure
+#	1. (link to hash) structure
 # Returns
-#	Normalized entity structure
+#	Normalized structure
+# IMPORTANT! One should aboid to call this function on structure containing
+# cyclic links - this will cause recursion
 
-sub normalize_entity {
-    my $entity = shift;
+sub normalize_structure {
+    my $structure = shift;
 
-# change type of modtime service field
-    if (exists($entity->{'modtime'})) {
-	$entity->{'modtime'} += 0;
+    if (ref($structure) eq 'ARRAY') {
+	foreach (@$structure) {
+	    $_ = normalize_structure($_);
+	}
     }
+    elsif (ref($structure) eq 'HASH') {
+	foreach (keys(%$structure)) {
+	    $structure->{$_} = normalize_structure($structure->{$_});
+	}
+    }
+    elsif (ref($structure) eq '') {
+	if (check_decimal($structure, 1)) {
 
-# change types of the attributes
-    if (exists($entity->{'attributes'})) {
-
-	foreach my $attr (keys(%{$entity->{'attributes'}})) {
-
-	    foreach (@{$entity->{'attributes'}->{$attr}}) {
-
-		if (check_decimal($_, 1)) {
-
-		    $_ += 0;
-
-		}
-
-	    }
+	    $structure += 0;
 
 	}
-
     }
 
-    return $entity;
+    return $structure;
+
 }
 
 # Function: set_unicode_flag
@@ -172,6 +169,8 @@ sub normalize_entity {
 #	2. (boolean) unicode flag value
 # Returns
 #	Resulting structure
+# IMPORTANT! One should aboid to call this function on structure containing
+# cyclic links - this will cause recursion
 
 sub set_unicode_flag {
     my $structure = shift;
