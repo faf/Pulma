@@ -490,6 +490,7 @@ module)
 
 sub check_uri {
     my $string = shift;
+    return 0 unless $string;
     $string = idn_url($string);
     $string =~ s/^https/http/;
     return $string =~ /$RE{URI}{HTTP}/ ? 1 : 0;
