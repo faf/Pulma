@@ -97,62 +97,79 @@ unless ( exists($config->{'map'}) &&
 	 exists($config->{'map'}->{'file'}) ) {
 
     print STDERR
-	  "[error] Invalid configuration: can't find complete map section with filename!";
+	  "[error] Invalid configuration: can't find complete map section with filename(s)!";
     exit(1);
 
 }
 
-unless (-r $config->{'map'}->{'file'}) {
-
-    print STDERR sprintf( "[error] Map file '%s' not exist or not readable!\n",
-			  $config->{'map'}->{'file'} );
-    exit(1);
-
+my $map_files = [];
+if (ref($config->{'map'}->{'file'}) eq '') {
+    $map_files = [ $config->{'map'}->{'file'} ];
 }
-
-# read data from file
-my @contents;
-if (open(IN, "<", $config->{'map'}->{'file'})) {
-
-    @contents = <IN>;
-
-    unless (close(IN)) {
-
-	print STDERR
-	      sprintf( "[error] Something weird: can't close map file '%s': %s\n",
-		       $config->{'map'}->{'file'}, $! );
-
-	exit(1);
-
-    }
-
+elsif (ref($config->{'map'}->{'file'}) eq 'ARRAY') {
+    $map_files = $config->{'map'}->{'file'};
 }
 else {
-
-    print STDERR sprintf( "[error] Can't open map file '%s' for read: %s\n",
-			  $config->{'map'}->{'file'}, $! );
+    print STDERR
+	  "[error] Invalid configuration: can't find valid map section with filename(s)!";
     exit(1);
-
 }
 
 # initialize data parser
 my $parser = Pulma::Service::Data::Parser->new();
 
-# parse data
-my $data = $parser->decode(join('', @contents));
-unless (defined $data) {
-
-    print STDERR sprintf( "[error] Data structure in map file '%s' is invalid.\n",
-			  $config->{'map'}->{'file'} );
-
-    exit(1);
-
-}
-
 my @paths;
-foreach (keys(%$data)) {
+foreach my $map_file (@$map_files) {
 
-    push (@paths, $_) unless (/^\/.*[^\/]$/);
+    unless (-r $map_file) {
+
+	print STDERR sprintf( "[error] Map file '%s' not exist or not readable!\n",
+			    $map_file );
+	exit(1);
+
+    }
+
+# read data from file
+    my @contents;
+    if (open(IN, "<", $map_file)) {
+
+	@contents = <IN>;
+
+	unless (close(IN)) {
+
+	    print STDERR
+		  sprintf( "[error] Something weird: can't close map file '%s': %s\n",
+			   $map_file, $! );
+
+	    exit(1);
+
+	}
+
+    }
+    else {
+
+	print STDERR sprintf( "[error] Can't open map file '%s' for read: %s\n",
+			      $map_file, $! );
+	exit(1);
+
+    }
+
+# parse data
+    my $data = $parser->decode(join('', @contents));
+    unless (defined $data) {
+
+	print STDERR sprintf( "[error] Data structure in map file '%s' is invalid.\n",
+				$map_file );
+
+	exit(1);
+
+    }
+
+    foreach (keys(%$data)) {
+
+	push (@paths, $_) unless (/^\/.*[^\/]$/);
+
+    }
 
 }
 
