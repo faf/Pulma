@@ -545,17 +545,29 @@ while($request = CGI::Fast->new()) {
 # prepare cookies to store
     foreach my $cookie (@{$data->{'result'}->{'cookies'}}) {
 
-	push(@{$data->{'result'}->{'headers'}->{'-cookie'}},
-	     cookie( -name => $cookie->{'name'} || 'pulma',
-		     -secure => $cookie->{'secure'} || 0,
-		     -httponly => $cookie->{'httponly'} || 0,
-		     -value => exists ($cookie->{'value'}) ?
-				$cookie->{'value'} :
-				'pulma',
-		     -path => $cookie->{'path'} || $config->{'map'}->{'root'} ||
-			      '/',
-		     -expires => ($cookie->{'delete'} ? '-' : '+') .
-				 ($cookie->{'expires'} || '120') . 's'));
+	my $structure = { -name => $cookie->{'name'} || 'pulma',
+			  -secure => $cookie->{'secure'} || 0,
+			  -httponly => $cookie->{'httponly'} || 0,
+			  -value => exists ($cookie->{'value'}) ?
+				    $cookie->{'value'} :
+				    'pulma',
+			  -path => $cookie->{'path'} ||
+				   $config->{'map'}->{'root'} ||
+				    '/'
+	};
+
+	if (!exists($cookie->{'expires'})) {
+	    if (exists($cookie->{'delete'})) {
+		$structure->{-expires} = '-' . 120 . 's';
+	    }
+	}
+	else {
+	    $structure->{-expires} = ($cookie->{'delete'} ? '-' : '+') .
+				     $cookie->{'expires'} . 's';
+	}
+
+	push( @{$data->{'result'}->{'headers'}->{'-cookie'}},
+	      cookie( $structure ) );
 
     }
 
