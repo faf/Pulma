@@ -4,7 +4,7 @@ Part of Pulma system
 
 Module providing service functions for the layer of data operations
 
-Copyright (C) 2012 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
+Copyright (C) 2012, 2013 Fedor A. Fetisov <faf@ossg.ru>. All Rights Reserved
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -35,13 +35,29 @@ our @ISA = ('Exporter');
 our @EXPORT = qw( &check_filter_operation &compare_attributes
 		  &normalize_structure &set_unicode_flag );
 
-# Function: check_filter_operation
-# Description
-#	Validate an operation used in data filter
-# Argument(s)
-#	1. (string) operation
-# Returns
-#	true if operation is valid or false on error
+=head1 Function: check_filter_operation
+
+=head2 Description
+
+Validate an operation used in data filter
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (string) operation
+
+=back
+
+=head2 Returns
+
+=over
+
+=item true if operation is valid or false on error
+
+=back
+
+=cut
 
 sub check_filter_operation {
     my $operation = shift;
@@ -56,18 +72,37 @@ sub check_filter_operation {
 	     ($operation eq '~~' ) );
 }
 
-# Function: compare_attributes
-# Description
-#	Compare given attributes of two entities in order to sort them
-# Argument(s)
-#	1. (link to hash) first entity
-#	2. (link to hash) second entity
-#	3. (string) attribute name
-#	4. (string) sort mode (optional, default: ascendant sort with symbolic
-#		    comparsion)
-# Returns
-#	1 if first entity should stand before second entity, 0 if they are equal,
-#	or -1 if second entity should stand before first entity
+=head1 Function: compare_attributes
+
+=head2 Description
+
+Compare given attributes of two entities in order to sort them
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to hash) first entity
+
+=item 2. (link to hash) second entity
+
+=item 3. (string) attribute name
+
+=item 4. (string) sort mode (optional, default: ascendant sort with symbolic
+comparsion)
+
+=back
+
+=head2 Returns
+
+=over
+
+=item 1 if first entity should stand before second entity, 0 if they are equal,
+or -1 if second entity should stand before first entity
+
+=back
+
+=cut
 
 sub compare_attributes {
     my $first = shift;
@@ -125,16 +160,33 @@ sub compare_attributes {
     return 0;
 }
 
-# Function: normalize_structure
-# Description
-#	Make numeric attributes of the structure actually numeric (change their
-#	types from string to integer / float
-# Argument(s)
-#	1. (link to hash) structure
-# Returns
-#	Normalized structure
-# IMPORTANT! One should aboid to call this function on structure containing
-# cyclic links - this will cause recursion
+=head1 Function: normalize_structure
+
+=head2 Description
+
+Make numeric attributes of the structure actually numeric (change their
+types from string to integer / float
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (link to hash) structure
+
+=back
+
+=head2 Returns
+
+=over
+
+=item Normalized structure
+
+=back
+
+B<IMPORTANT!> One should aboid to call this function on structure containing
+cyclic links - this will cause recursion
+
+=cut
 
 sub normalize_structure {
     my $structure = shift;
@@ -161,16 +213,34 @@ sub normalize_structure {
 
 }
 
-# Function: set_unicode_flag
-# Description
-#	Set or unset unicode flag on all values in the given data structure
-# Argument(s)
-#	1. (various) structure to proceed with
-#	2. (boolean) unicode flag value
-# Returns
-#	Resulting structure
-# IMPORTANT! One should aboid to call this function on structure containing
-# cyclic links - this will cause recursion
+=head1 Function: set_unicode_flag
+
+=head2 Description
+
+Set or unset unicode flag on all values in the given data structure
+
+=head2 Argument(s)
+
+=over
+
+=item 1. (various) structure to proceed with
+
+=item 2. (boolean) unicode flag value
+
+=back
+
+=head2 Returns
+
+=over
+
+=item Resulting structure
+
+=back
+
+B<IMPORTANT!> One should aboid to call this function on structure containing
+cyclic links - this will cause recursion
+
+=cut
 
 sub set_unicode_flag {
     my $structure = shift;
